@@ -993,3 +993,18 @@ func (mr *MockIDagMockRecorder) InsertLightHeader(headers interface{}) *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertLightHeader", reflect.TypeOf((*MockIDag)(nil).InsertLightHeader), headers)
 }
+
+// GetAllLeafNodes mocks base method
+func (m *MockIDag) GetAllLeafNodes() ([]*modules.Header, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAllLeafNodes")
+	ret0, _ := ret[0].([]*modules.Header)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAllLeafNodes indicates an expected call of GetAllLeafNodes
+func (mr *MockIDagMockRecorder) GetAllLeafNodes() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllLeafNodes", reflect.TypeOf((*MockIDag)(nil).GetAllLeafNodes))
+}

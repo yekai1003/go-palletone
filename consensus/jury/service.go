@@ -74,6 +74,7 @@ type iDag interface {
 	CreateGenericTransaction(from, to common.Address, daoAmount, daoFee uint64,
 		msg *modules.Message, txPool txspool.ITxPool) (*modules.Transaction, uint64, error)
 	GetTransactionOnly(hash common.Hash) (*modules.Transaction, error)
+	GetHeaderByHash(common.Hash) (*modules.Header, error)
 }
 
 type Juror struct {
