@@ -19,7 +19,7 @@ func TestSimpleSignHash(t *testing.T) {
 	privateKey := "L3vhqkbATXGc4o7VTG1mT7z1gDEFn1QmVwtxd4kWL9mMJevWnzwo"
 	// privateKeyBytes := hexutil.MustDecode(privateKey)
 	prvKey, _ := crypto.FromWIF(privateKey)
-
+    
 	//signB, _ := hexutil.Decode(sign)
 	signature, _ := crypto.Sign(hash.Bytes(), prvKey)
 	t.Log("Signature is: " + hexutil.Encode(signature))
