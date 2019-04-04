@@ -12,17 +12,16 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-Modified create gmfactory by Tongji Fintech Research Institute on 2017-09-10.
 */
 package factory
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/palletone/go-palletone/bccsp"
 
 	"github.com/palletone/go-palletone/common/log"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -42,8 +41,6 @@ var (
 
 	// Factories' Initialization Error
 	factoriesInitError error
-
-	//logger = flogging.MustGetLogger("bccsp")
 )
 
 // BCCSPFactory is used to get instances of the BCCSP interface.
@@ -60,11 +57,10 @@ type BCCSPFactory interface {
 // GetDefault returns a non-ephemeral (long-term) BCCSP
 func GetDefault() bccsp.BCCSP {
 	if defaultBCCSP == nil {
-		log.Warn("Before using BCCSP, please call InitFactories(). Falling back to bootBCCSP.")
+		log.Debug("Before using BCCSP, please call InitFactories(). Falling back to bootBCCSP.")
 		bootBCCSPInitOnce.Do(func() {
 			var err error
-			//f := &SWFactory{}
-			f := &GMFactory{}
+			f := &SWFactory{}
 			bootBCCSP, err = f.Get(GetDefaultOpts())
 			if err != nil {
 				panic("BCCSP Internal error, failed initialization with GetDefaultOpts!")
@@ -79,7 +75,7 @@ func GetDefault() bccsp.BCCSP {
 func GetBCCSP(name string) (bccsp.BCCSP, error) {
 	csp, ok := bccspMap[name]
 	if !ok {
-		return nil, fmt.Errorf("Could not find BCCSP, no '%s' provider", name)
+		return nil, errors.Errorf("Could not find BCCSP, no '%s' provider", name)
 	}
 	return csp, nil
 }
@@ -87,7 +83,7 @@ func GetBCCSP(name string) (bccsp.BCCSP, error) {
 func initBCCSP(f BCCSPFactory, config *FactoryOpts) error {
 	csp, err := f.Get(config)
 	if err != nil {
-		return fmt.Errorf("Could not initialize BCCSP %s [%s]", f.Name(), err)
+		return errors.Errorf("Could not initialize BCCSP %s [%s]", f.Name(), err)
 	}
 
 	log.Debugf("Initialize BCCSP [%s]", f.Name())

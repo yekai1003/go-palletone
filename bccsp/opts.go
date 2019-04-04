@@ -12,7 +12,6 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-Modified gm opts  by Tongji Fintech Research Institute on 2017-09-8
 */
 package bccsp
 
@@ -224,10 +223,6 @@ func (opts *AESKeyGenOpts) Algorithm() string {
 func (opts *AESKeyGenOpts) Ephemeral() bool {
 	return opts.Temporary
 }
-
-// AESCBCPKCS7ModeOpts contains options for AES encryption in CBC mode
-// with PKCS7 padding.
-type AESCBCPKCS7ModeOpts struct{}
 
 // HMACTruncated256AESDeriveKeyOpts contains options for HMAC truncated
 // at 256 bits key derivation.

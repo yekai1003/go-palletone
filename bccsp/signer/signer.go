@@ -17,12 +17,11 @@ package signer
 
 import (
 	"crypto"
-	"errors"
-	"fmt"
 	"io"
 
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
+	"github.com/pkg/errors"
 )
 
 // bccspCryptoSigner is the BCCSP-based implementation of a crypto.Signer
@@ -49,17 +48,17 @@ func New(csp bccsp.BCCSP, key bccsp.Key) (crypto.Signer, error) {
 	// Marshall the bccsp public key as a crypto.PublicKey
 	pub, err := key.PublicKey()
 	if err != nil {
-		return nil, fmt.Errorf("failed getting public key [%s]", err)
+		return nil, errors.Wrap(err, "failed getting public key")
 	}
 
 	raw, err := pub.Bytes()
 	if err != nil {
-		return nil, fmt.Errorf("failed marshalling public key [%s]", err)
+		return nil, errors.Wrap(err, "failed marshalling public key")
 	}
 
 	pk, err := utils.DERToPublicKey(raw)
 	if err != nil {
-		return nil, fmt.Errorf("failed marshalling der to public key [%s]", err)
+		return nil, errors.Wrap(err, "failed marshalling der to public key")
 	}
 
 	return &bccspCryptoSigner{csp, key, pk}, nil
@@ -84,6 +83,6 @@ func (s *bccspCryptoSigner) Public() crypto.PublicKey {
 // Note that when a signature of a hash of a larger message is needed,
 // the caller is responsible for hashing the larger message and passing
 // the hash (as digest) and the hash function (as opts) to Sign.
-func (s *bccspCryptoSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+func (s *bccspCryptoSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return s.csp.Sign(s.key, digest, opts)
 }

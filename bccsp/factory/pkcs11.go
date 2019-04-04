@@ -1,4 +1,4 @@
-// +build !nopkcs11
+// +build pkcs11
 
 /*
 Copyright IBM Corp. 2017 All Rights Reserved.
@@ -14,21 +14,20 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-Modified create gmfactory by Tongji Fintech Research Institute on 2017-09-10.
 */
 package factory
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/pkcs11"
+	"github.com/pkg/errors"
 )
 
+// FactoryOpts holds configuration information used to initialize factory implementations
 type FactoryOpts struct {
 	ProviderName string             `mapstructure:"default" json:"default" yaml:"Default"`
 	SwOpts       *SwOpts            `mapstructure:"SW,omitempty" json:"SW,omitempty" yaml:"SwOpts"`
+	PluginOpts   *PluginOpts        `mapstructure:"PLUGIN,omitempty" json:"PLUGIN,omitempty" yaml:"PluginOpts"`
 	Pkcs11Opts   *pkcs11.PKCS11Opts `mapstructure:"PKCS11,omitempty" json:"PKCS11,omitempty" yaml:"PKCS11"`
 }
 
@@ -50,12 +49,9 @@ func setFactories(config *FactoryOpts) error {
 		config = GetDefaultOpts()
 	}
 
-	// if config.ProviderName == "" {
-	// 	config.ProviderName = "GM"
-	// }
-
-	//暂时由GM替代bccsp
-	config.ProviderName = "GM"
+	if config.ProviderName == "" {
+		config.ProviderName = "SW"
+	}
 
 	if config.SwOpts == nil {
 		config.SwOpts = GetDefaultOpts().SwOpts
@@ -66,15 +62,10 @@ func setFactories(config *FactoryOpts) error {
 
 	// Software-Based BCCSP
 	if config.SwOpts != nil {
-		var f BCCSPFactory
-		if strings.ToUpper(config.ProviderName) == "GM" {
-			f = &GMFactory{}
-		} else {
-			f = &SWFactory{}
-		}
+		f := &SWFactory{}
 		err := initBCCSP(f, config)
 		if err != nil {
-			factoriesInitError = fmt.Errorf("Failed initializing SW.BCCSP [%s]", err)
+			factoriesInitError = errors.Wrap(err, "Failed initializing SW.BCCSP")
 		}
 	}
 
@@ -83,14 +74,23 @@ func setFactories(config *FactoryOpts) error {
 		f := &PKCS11Factory{}
 		err := initBCCSP(f, config)
 		if err != nil {
-			factoriesInitError = fmt.Errorf("Failed initializing PKCS11.BCCSP %s\n[%s]", factoriesInitError, err)
+			factoriesInitError = errors.Wrapf(err, "Failed initializing PKCS11.BCCSP %s", factoriesInitError)
+		}
+	}
+
+	// BCCSP Plugin
+	if config.PluginOpts != nil {
+		f := &PluginFactory{}
+		err := initBCCSP(f, config)
+		if err != nil {
+			factoriesInitError = errors.Wrapf(err, "Failed initializing PKCS11.BCCSP %s", factoriesInitError)
 		}
 	}
 
 	var ok bool
 	defaultBCCSP, ok = bccspMap[config.ProviderName]
 	if !ok {
-		factoriesInitError = fmt.Errorf("%s\nCould not find default `%s` BCCSP", factoriesInitError, config.ProviderName)
+		factoriesInitError = errors.Errorf("%s\nCould not find default `%s` BCCSP", factoriesInitError, config.ProviderName)
 	}
 
 	return factoriesInitError
@@ -100,19 +100,19 @@ func setFactories(config *FactoryOpts) error {
 func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	var f BCCSPFactory
 	switch config.ProviderName {
-	case "GM":
-		f = &GMFactory{}
 	case "SW":
 		f = &SWFactory{}
 	case "PKCS11":
 		f = &PKCS11Factory{}
+	case "PLUGIN":
+		f = &PluginFactory{}
 	default:
-		return nil, fmt.Errorf("Could not find BCCSP, no '%s' provider", config.ProviderName)
+		return nil, errors.Errorf("Could not find BCCSP, no '%s' provider", config.ProviderName)
 	}
 
 	csp, err := f.Get(config)
 	if err != nil {
-		return nil, fmt.Errorf("Could not initialize BCCSP %s [%s]", f.Name(), err)
+		return nil, errors.Wrapf(err, "Could not initialize BCCSP %s", f.Name())
 	}
 	return csp, nil
 }

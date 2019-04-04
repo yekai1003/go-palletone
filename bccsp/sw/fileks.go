@@ -17,18 +17,16 @@ package sw
 
 import (
 	"bytes"
-	"io/ioutil"
-	"os"
-	"sync"
-
-	"errors"
-	"strings"
-
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
@@ -36,7 +34,7 @@ import (
 )
 
 // NewFileBasedKeyStore instantiated a file-based key store at a given position.
-// The key store can be encrypted if a non-empty password is specifiec.
+// The key store can be encrypted if a non-empty password is specified.
 // It can be also be set as read only. In this case, any store operation
 // will be forbidden
 func NewFileBasedKeyStore(pwd []byte, path string, readOnly bool) (bccsp.KeyStore, error) {
@@ -113,7 +111,7 @@ func (ks *fileBasedKeyStore) ReadOnly() bool {
 }
 
 // GetKey returns a key object whose SKI is the one passed.
-func (ks *fileBasedKeyStore) GetKey(ski []byte) (k bccsp.Key, err error) {
+func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 	// Validate arguments
 	if len(ski) == 0 {
 		return nil, errors.New("Invalid SKI. Cannot be of zero length.")
@@ -230,6 +228,11 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 		if f.IsDir() {
 			continue
 		}
+
+		if f.Size() > (1 << 16) { //64k, somewhat arbitrary limit, considering even large RSA keys
+			continue
+		}
+
 		raw, err := ioutil.ReadFile(filepath.Join(ks.path, f.Name()))
 		if err != nil {
 			continue
@@ -255,7 +258,7 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 
 		return k, nil
 	}
-	return nil, errors.New("Key type not recognized")
+	return nil, fmt.Errorf("Key with SKI %s not found in %s", hex.EncodeToString(ski), ks.path)
 }
 
 func (ks *fileBasedKeyStore) getSuffix(alias string) string {
@@ -284,7 +287,7 @@ func (ks *fileBasedKeyStore) storePrivateKey(alias string, privateKey interface{
 		return err
 	}
 
-	err = ioutil.WriteFile(ks.getPathForAlias(alias, "sk"), rawKey, 0700)
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "sk"), rawKey, 0600)
 	if err != nil {
 		log.Errorf("Failed storing private key [%s]: [%s]", alias, err)
 		return err
@@ -300,7 +303,7 @@ func (ks *fileBasedKeyStore) storePublicKey(alias string, publicKey interface{})
 		return err
 	}
 
-	err = ioutil.WriteFile(ks.getPathForAlias(alias, "pk"), rawKey, 0700)
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "pk"), rawKey, 0600)
 	if err != nil {
 		log.Errorf("Failed storing private key [%s]: [%s]", alias, err)
 		return err
@@ -316,7 +319,7 @@ func (ks *fileBasedKeyStore) storeKey(alias string, key []byte) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(ks.getPathForAlias(alias, "key"), pem, 0700)
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "key"), pem, 0600)
 	if err != nil {
 		log.Errorf("Failed storing key [%s]: [%s]", alias, err)
 		return err
@@ -421,7 +424,7 @@ func (ks *fileBasedKeyStore) openKeyStore() error {
 	if ks.isOpen {
 		return nil
 	}
-
+	ks.isOpen = true
 	log.Debugf("KeyStore opened at [%s]...done", ks.path)
 
 	return nil
