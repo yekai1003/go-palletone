@@ -18,7 +18,7 @@ package gm
 import (
 	"errors"
 	"crypto/sha256"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
+	"github.com/palletone/go-palletone/bccsp"
 )
 
 //定义国密 SM4 结构体，实现 bccsp Key 的接口

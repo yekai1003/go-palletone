@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
+	"github.com/palletone/go-palletone/bccsp"
 )
 
 type ecdsaSignature struct {

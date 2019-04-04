@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
-	"github.com/tjfoc/hyperledger-fabric-gm/common/flogging"
+	"github.com/palletone/go-palletone/bccsp"
+
+	"github.com/palletone/go-palletone/common/log"
 )
 
 var (
@@ -42,7 +43,7 @@ var (
 	// Factories' Initialization Error
 	factoriesInitError error
 
-	logger = flogging.MustGetLogger("bccsp")
+	//logger = flogging.MustGetLogger("bccsp")
 )
 
 // BCCSPFactory is used to get instances of the BCCSP interface.
@@ -59,7 +60,7 @@ type BCCSPFactory interface {
 // GetDefault returns a non-ephemeral (long-term) BCCSP
 func GetDefault() bccsp.BCCSP {
 	if defaultBCCSP == nil {
-		logger.Warning("Before using BCCSP, please call InitFactories(). Falling back to bootBCCSP.")
+		log.Warn("Before using BCCSP, please call InitFactories(). Falling back to bootBCCSP.")
 		bootBCCSPInitOnce.Do(func() {
 			var err error
 			//f := &SWFactory{}
@@ -89,7 +90,7 @@ func initBCCSP(f BCCSPFactory, config *FactoryOpts) error {
 		return fmt.Errorf("Could not initialize BCCSP %s [%s]", f.Name(), err)
 	}
 
-	logger.Debugf("Initialize BCCSP [%s]", f.Name())
+	log.Debugf("Initialize BCCSP [%s]", f.Name())
 	bccspMap[f.Name()] = csp
 	return nil
 }

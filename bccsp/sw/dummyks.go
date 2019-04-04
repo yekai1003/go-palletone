@@ -18,7 +18,7 @@ package sw
 import (
 	"errors"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
+	"github.com/palletone/go-palletone/bccsp"
 )
 
 // NewDummyKeyStore instantiate a dummy key store

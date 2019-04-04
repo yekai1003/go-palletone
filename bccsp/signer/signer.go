@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/utils"
+	"github.com/palletone/go-palletone/bccsp"
+	"github.com/palletone/go-palletone/bccsp/utils"
 )
 
 // bccspCryptoSigner is the BCCSP-based implementation of a crypto.Signer

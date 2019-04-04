@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
+	"github.com/palletone/go-palletone/bccsp"
 )
 
 type FactoryOpts struct {

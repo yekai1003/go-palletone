@@ -25,8 +25,8 @@ import (
 	"crypto/x509"
 	"reflect"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/utils"
+	"github.com/palletone/go-palletone/bccsp"
+	"github.com/palletone/go-palletone/bccsp/utils"
 )
 
 type aes256ImportKeyOptsKeyImporter struct{}

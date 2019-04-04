@@ -20,7 +20,7 @@ import (
 
 	"crypto/sha256"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
+	"github.com/palletone/go-palletone/bccsp"
 )
 
 type aesPrivateKey struct {

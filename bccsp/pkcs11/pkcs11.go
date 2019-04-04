@@ -26,12 +26,13 @@ import (
 	"sync"
 
 	"github.com/miekg/pkcs11"
-	"github.com/op/go-logging"
+
+	"github.com/palletone/go-palletone/common/log"
 )
 
 func loadLib(lib, pin, label string) (*pkcs11.Ctx, uint, *pkcs11.SessionHandle, error) {
 	var slot uint = 0
-	logger.Debugf("Loading pkcs11 library [%s]\n", lib)
+	log.Debugf("Loading pkcs11 library [%s]\n", lib)
 	if lib == "" {
 		return nil, slot, nil, fmt.Errorf("No PKCS11 library default")
 	}
@@ -52,7 +53,7 @@ func loadLib(lib, pin, label string) (*pkcs11.Ctx, uint, *pkcs11.SessionHandle, 
 		if err != nil {
 			continue
 		}
-		logger.Debugf("Looking for %s, found label %s\n", label, info.Label)
+		log.Debugf("Looking for %s, found label %s\n", label, info.Label)
 		if label == info.Label {
 			found = true
 			slot = s
@@ -67,15 +68,15 @@ func loadLib(lib, pin, label string) (*pkcs11.Ctx, uint, *pkcs11.SessionHandle, 
 	for i := 0; i < 10; i++ {
 		session, err = ctx.OpenSession(slot, pkcs11.CKF_SERIAL_SESSION|pkcs11.CKF_RW_SESSION)
 		if err != nil {
-			logger.Warningf("OpenSession failed, retrying [%s]\n", err)
+			log.Warnf("OpenSession failed, retrying [%s]\n", err)
 		} else {
 			break
 		}
 	}
 	if err != nil {
-		logger.Fatalf("OpenSession [%s]\n", err)
+		log.Errorf("OpenSession [%s]\n", err)
 	}
-	logger.Debugf("Created new pkcs11 session %+v on slot %d\n", session, slot)
+	log.Debugf("Created new pkcs11 session %+v on slot %d\n", session, slot)
 
 	if pin == "" {
 		return nil, slot, nil, fmt.Errorf("No PIN set\n")
@@ -93,7 +94,7 @@ func loadLib(lib, pin, label string) (*pkcs11.Ctx, uint, *pkcs11.SessionHandle, 
 func (csp *impl) getSession() (session pkcs11.SessionHandle) {
 	select {
 	case session = <-csp.sessions:
-		logger.Debugf("Reusing existing pkcs11 session %+v on slot %d\n", session, csp.slot)
+		log.Debugf("Reusing existing pkcs11 session %+v on slot %d\n", session, csp.slot)
 
 	default:
 		// cache is empty (or completely in use), create a new session
@@ -102,7 +103,7 @@ func (csp *impl) getSession() (session pkcs11.SessionHandle) {
 		for i := 0; i < 10; i++ {
 			s, err = csp.ctx.OpenSession(csp.slot, pkcs11.CKF_SERIAL_SESSION|pkcs11.CKF_RW_SESSION)
 			if err != nil {
-				logger.Warningf("OpenSession failed, retrying [%s]\n", err)
+				log.Warnf("OpenSession failed, retrying [%s]\n", err)
 			} else {
 				break
 			}
@@ -110,7 +111,7 @@ func (csp *impl) getSession() (session pkcs11.SessionHandle) {
 		if err != nil {
 			panic(fmt.Errorf("OpenSession failed [%s]\n", err))
 		}
-		logger.Debugf("Created new pkcs11 session %+v on slot %d\n", s, csp.slot)
+		log.Debugf("Created new pkcs11 session %+v on slot %d\n", s, csp.slot)
 		session = s
 	}
 	return session
@@ -136,7 +137,7 @@ func (csp *impl) getECKey(ski []byte) (pubKey *ecdsa.PublicKey, isPriv bool, err
 	_, err = findKeyPairFromSKI(p11lib, session, ski, privateKeyFlag)
 	if err != nil {
 		isPriv = false
-		logger.Debugf("Private key not found [%s] for SKI [%s], looking for Public key", err, hex.EncodeToString(ski))
+		log.Debugf("Private key not found [%s] for SKI [%s], looking for Public key", err, hex.EncodeToString(ski))
 	}
 
 	publicKey, err := findKeyPairFromSKI(p11lib, session, ski, publicKeyFlag)
@@ -275,7 +276,7 @@ func (csp *impl) generateECKey(curve asn1.ObjectIdentifier, ephemeral bool) (ski
 		pkcs11.NewAttribute(pkcs11.CKA_ID, ski),
 	}
 
-	logger.Infof("Generated new P11 key, SKI %x\n", ski)
+	log.Infof("Generated new P11 key, SKI %x\n", ski)
 	err = p11lib.SetAttributeValue(session, pub, setski_t)
 	if err != nil {
 		return nil, nil, fmt.Errorf("P11: set-ID-to-SKI[public] failed [%s]\n", err)
@@ -297,10 +298,10 @@ func (csp *impl) generateECKey(curve asn1.ObjectIdentifier, ephemeral bool) (ski
 
 	pubGoKey := &ecdsa.PublicKey{Curve: nistCurve, X: x, Y: y}
 
-	if logger.IsEnabledFor(logging.DEBUG) {
-		listAttrs(p11lib, session, prv)
-		listAttrs(p11lib, session, pub)
-	}
+	//if log.IsEnabledFor(logging.DEBUG) {
+	listAttrs(p11lib, session, prv)
+	listAttrs(p11lib, session, pub)
+	//}
 
 	return ski, pubGoKey, nil
 }
@@ -340,7 +341,7 @@ func (csp *impl) verifyP11ECDSA(ski []byte, msg []byte, R, S *big.Int, byteSize 
 	session := csp.getSession()
 	defer csp.returnSession(session)
 
-	logger.Debugf("Verify ECDSA\n")
+	log.Debugf("Verify ECDSA\n")
 
 	publicKey, err := findKeyPairFromSKI(p11lib, session, ski, publicKeyFlag)
 	if err != nil {
@@ -385,7 +386,7 @@ func (csp *impl) importECKey(curve asn1.ObjectIdentifier, privKey, ecPt []byte, 
 
 	var keyTemplate []*pkcs11.Attribute
 	if keyType == publicKeyFlag {
-		logger.Debug("Importing Public EC Key")
+		log.Debug("Importing Public EC Key")
 		publabel := fmt.Sprintf("BCPUB%s", id.Text(16))
 
 		hash := sha256.Sum256(ecPt)
@@ -412,7 +413,7 @@ func (csp *impl) importECKey(curve asn1.ObjectIdentifier, privKey, ecPt []byte, 
 			return nil, fmt.Errorf("Failed importing private EC Key [%s]\n", err)
 		}
 
-		logger.Debugf("Importing Private EC Key [%d]\n%s\n", len(privKey)*8, hex.Dump(privKey))
+		log.Debugf("Importing Private EC Key [%d]\n%s\n", len(privKey)*8, hex.Dump(privKey))
 		prvlabel := fmt.Sprintf("BCPRV%s", id.Text(16))
 		keyTemplate = []*pkcs11.Attribute{
 			pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_EC),
@@ -435,9 +436,9 @@ func (csp *impl) importECKey(curve asn1.ObjectIdentifier, privKey, ecPt []byte, 
 		return nil, fmt.Errorf("P11: keypair generate failed [%s]\n", err)
 	}
 
-	if logger.IsEnabledFor(logging.DEBUG) {
-		listAttrs(p11lib, session, keyHandle)
-	}
+	//if log.IsEnabledFor(logging.DEBUG) {
+	listAttrs(p11lib, session, keyHandle)
+	//}
 
 	return ski, nil
 }
@@ -531,22 +532,22 @@ func ecPoint(p11lib *pkcs11.Ctx, session pkcs11.SessionHandle, key pkcs11.Object
 
 	for _, a := range attr {
 		if a.Type == pkcs11.CKA_EC_POINT {
-			logger.Debugf("EC point: attr type %d/0x%x, len %d\n%s\n", a.Type, a.Type, len(a.Value), hex.Dump(a.Value))
+			log.Debugf("EC point: attr type %d/0x%x, len %d\n%s\n", a.Type, a.Type, len(a.Value), hex.Dump(a.Value))
 
 			// workarounds, see above
 			if (0 == (len(a.Value) % 2)) &&
 				(byte(0x04) == a.Value[0]) &&
 				(byte(0x04) == a.Value[len(a.Value)-1]) {
-				logger.Debugf("Detected opencryptoki bug, trimming trailing 0x04")
+				log.Debugf("Detected opencryptoki bug, trimming trailing 0x04")
 				ecpt = a.Value[0 : len(a.Value)-1] // Trim trailing 0x04
 			} else if byte(0x04) == a.Value[0] && byte(0x04) == a.Value[2] {
-				logger.Debugf("Detected SoftHSM bug, trimming leading 0x04 0xXX")
+				log.Debugf("Detected SoftHSM bug, trimming leading 0x04 0xXX")
 				ecpt = a.Value[2:len(a.Value)]
 			} else {
 				ecpt = a.Value
 			}
 		} else if a.Type == pkcs11.CKA_EC_PARAMS {
-			logger.Debugf("EC point: attr type %d/0x%x, len %d\n%s\n", a.Type, a.Type, len(a.Value), hex.Dump(a.Value))
+			log.Debugf("EC point: attr type %d/0x%x, len %d\n%s\n", a.Type, a.Type, len(a.Value), hex.Dump(a.Value))
 
 			oid = a.Value
 		}
@@ -576,12 +577,12 @@ func listAttrs(p11lib *pkcs11.Ctx, session pkcs11.SessionHandle, obj pkcs11.Obje
 	// certain errors are tolerated, if value is missing
 	attr, err := p11lib.GetAttributeValue(session, obj, template)
 	if err != nil {
-		logger.Debugf("P11: get(attrlist) [%s]\n", err)
+		log.Debugf("P11: get(attrlist) [%s]\n", err)
 	}
 
 	for _, a := range attr {
 		// Would be friendlier if the bindings provided a way convert Attribute hex to string
-		logger.Debugf("ListAttr: type %d/0x%x, length %d\n%s", a.Type, a.Type, len(a.Value), hex.Dump(a.Value))
+		log.Debugf("ListAttr: type %d/0x%x, length %d\n%s", a.Type, a.Type, len(a.Value), hex.Dump(a.Value))
 	}
 }
 
@@ -600,15 +601,15 @@ func (csp *impl) getSecretValue(ski []byte) []byte {
 	// certain errors are tolerated, if value is missing
 	attr, err := p11lib.GetAttributeValue(session, *keyHandle, template)
 	if err != nil {
-		logger.Warningf("P11: get(attrlist) [%s]\n", err)
+		log.Warnf("P11: get(attrlist) [%s]\n", err)
 	}
 
 	for _, a := range attr {
 		// Would be friendlier if the bindings provided a way convert Attribute hex to string
-		logger.Debugf("ListAttr: type %d/0x%x, length %d\n%s", a.Type, a.Type, len(a.Value), hex.Dump(a.Value))
+		log.Debugf("ListAttr: type %d/0x%x, length %d\n%s", a.Type, a.Type, len(a.Value), hex.Dump(a.Value))
 		return a.Value
 	}
-	logger.Warningf("No Key Value found!", err)
+	log.Warnf("No Key Value found!", err)
 	return nil
 }
 

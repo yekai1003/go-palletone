@@ -19,8 +19,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/sw"
+	"github.com/palletone/go-palletone/bccsp"
+	"github.com/palletone/go-palletone/bccsp/sw"
 )
 
 const (

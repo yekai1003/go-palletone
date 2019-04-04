@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/mocks"
+	"github.com/palletone/go-palletone/bccsp/mocks"
 	"github.com/stretchr/testify/assert"
 )
 

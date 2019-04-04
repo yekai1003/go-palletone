@@ -18,7 +18,7 @@ package gm
 import (
 	"errors"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
+	"github.com/palletone/go-palletone/bccsp"
 )
 
 //模拟实现

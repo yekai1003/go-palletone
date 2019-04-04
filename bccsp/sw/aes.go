@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
+	"github.com/palletone/go-palletone/bccsp"
 )
 
 // GetRandomBytes returns len random looking bytes

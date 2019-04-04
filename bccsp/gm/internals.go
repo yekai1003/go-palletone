@@ -18,7 +18,7 @@ package gm
 import (
 	"hash"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
+	"github.com/palletone/go-palletone/bccsp"
 )
 
 // KeyGenerator is a BCCSP-like interface that provides key generation algorithms

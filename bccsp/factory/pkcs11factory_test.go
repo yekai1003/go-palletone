@@ -19,7 +19,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/pkcs11"
+	"github.com/palletone/go-palletone/bccsp/pkcs11"
 	"github.com/stretchr/testify/assert"
 )
 

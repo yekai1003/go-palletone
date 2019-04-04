@@ -604,6 +604,12 @@
 			"revisionTime": "2017-02-01T02:35:40Z"
 		},
 		{
+			"checksumSHA1": "fa48DCa3K2rdj+s9hlPqSKQYxxQ=",
+			"path": "github.com/miekg/pkcs11",
+			"revision": "553cfdd26aaafe851ca66a5e8015f0decb6b5a1e",
+			"revisionTime": "2019-04-01T11:43:59Z"
+		},
+		{
 			"checksumSHA1": "L3leymg2RT8hFl5uL+5KP/LpBkg=",
 			"path": "github.com/mitchellh/go-wordwrap",
 			"revision": "ad45545899c7b13c020ea92b2072220eefad42b8",
@@ -892,6 +898,30 @@
 			"revisionTime": "2018-05-02T07:23:49Z"
 		},
 		{
+			"checksumSHA1": "puW4VnLRYj9CPFK2cW9819NMPfs=",
+			"path": "github.com/tjfoc/gmsm",
+			"revision": "fb33d2540a9bca895fba5ca76c7b1f81667320f7",
+			"revisionTime": "2019-03-06T06:58:15Z"
+		},
+		{
+			"checksumSHA1": "uGss20adQQPYpxHDfkM08eElTxY=",
+			"path": "github.com/tjfoc/gmsm/sm2",
+			"revision": "fb33d2540a9bca895fba5ca76c7b1f81667320f7",
+			"revisionTime": "2019-03-06T06:58:15Z"
+		},
+		{
+			"checksumSHA1": "zhRJnd9B6OyEWJluP9Ys2Wj4i+M=",
+			"path": "github.com/tjfoc/gmsm/sm3",
+			"revision": "fb33d2540a9bca895fba5ca76c7b1f81667320f7",
+			"revisionTime": "2019-03-06T06:58:15Z"
+		},
+		{
+			"checksumSHA1": "+4bxxoRPhD8zZlE4laoyCK9nPCo=",
+			"path": "github.com/tjfoc/gmsm/sm4",
+			"revision": "fb33d2540a9bca895fba5ca76c7b1f81667320f7",
+			"revisionTime": "2019-03-06T06:58:15Z"
+		},
+		{
 			"checksumSHA1": "QhDl7pO5Osv7PIdnqRy/28dzRlU=",
 			"path": "go.uber.org/atomic",
 			"revision": "1ea20fb1cbb1cc08cbd0d913a96dead89aa18289",
@@ -1016,6 +1046,12 @@
 			"path": "golang.org/x/crypto/scrypt",
 			"revision": "6a293f2d4b14b8e6d3f0539e383f6d0d30fce3fd",
 			"revisionTime": "2017-09-25T11:22:06Z"
+		},
+		{
+			"checksumSHA1": "LN1V2pZQwKnoDwcsgXpzG4+Vges=",
+			"path": "golang.org/x/crypto/sha3",
+			"revision": "de0752318171da717af4ce24d0a2e8626afaeb11",
+			"revisionTime": "2018-08-08T16:52:45Z"
 		},
 		{
 			"checksumSHA1": "Wi44TcpIOXdojyVWkvyOBnBKIS4=",

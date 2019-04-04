@@ -22,9 +22,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/mocks"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/utils"
+	"github.com/palletone/go-palletone/bccsp"
+	"github.com/palletone/go-palletone/bccsp/mocks"
+	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/stretchr/testify/assert"
 )
 

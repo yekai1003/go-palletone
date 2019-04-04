@@ -26,16 +26,16 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/sw"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/utils"
-	"github.com/tjfoc/hyperledger-fabric-gm/common/flogging"
+	"github.com/palletone/go-palletone/bccsp"
+	"github.com/palletone/go-palletone/bccsp/sw"
+	"github.com/palletone/go-palletone/bccsp/utils"
+
 	//"github.com/hyperledger/fabric/common/flogging"
 	"github.com/miekg/pkcs11"
+	"github.com/palletone/go-palletone/common/log"
 )
 
 var (
-	logger           = flogging.MustGetLogger("bccsp_p11")
 	sessionCacheSize = 10
 )
 
@@ -323,7 +323,7 @@ func (csp *impl) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.K
 		} else {
 			// Warn about potential future problems
 			if !csp.softVerify {
-				logger.Debugf("opencryptoki workaround warning: Importing public EC Key does not store out to pkcs11 store,\n" +
+				log.Debugf("opencryptoki workaround warning: Importing public EC Key does not store out to pkcs11 store,\n" +
 					"so verify with this key will fail, unless key is already present in store. Enable 'softwareverify'\n" +
 					"in pkcs11 options, if suspect this issue.")
 			}
@@ -395,7 +395,7 @@ func (csp *impl) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.K
 		} else {
 			// Warn about potential future problems
 			if !csp.softVerify {
-				logger.Debugf("opencryptoki workaround warning: Importing public EC Key does not store out to pkcs11 store,\n" +
+				log.Debugf("opencryptoki workaround warning: Importing public EC Key does not store out to pkcs11 store,\n" +
 					"so verify with this key will fail, unless key is already present in store. Enable 'softwareverify'\n" +
 					"in pkcs11 options, if suspect this issue.")
 			}

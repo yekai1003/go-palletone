@@ -24,9 +24,9 @@ import (
 	"reflect"
 	"testing"
 
-	mocks2 "github.com/tjfoc/hyperledger-fabric-gm/bccsp/mocks"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/sw/mocks"
-	"github.com/tjfoc/hyperledger-fabric-gm/bccsp/utils"
+	mocks2 "github.com/palletone/go-palletone/bccsp/mocks"
+	"github.com/palletone/go-palletone/bccsp/sw/mocks"
+	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/stretchr/testify/assert"
 )
 
