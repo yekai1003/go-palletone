@@ -33,12 +33,16 @@ type ChainParameters struct {
 
 	// 在维护时跳过的verifiedUnitInterval数量。 number of verifiedUnitInterval to skip at maintenance time
 	//	MaintenanceSkipSlots uint8
+
+	// 活跃mediator的最大数量。maximum number of active mediators
+	MaximumMediatorCount uint8 `json:"maxMediatorCount"`
 }
 
 func NewChainParams() (c ChainParameters) {
 	c.CurrentFees = newFeeSchedule()
 	c.MediatorInterval = DefaultMediatorInterval
 	c.MaintenanceInterval = DefaultMaintenanceInterval
+	c.MaximumMediatorCount = DefaultMaxMediatorCount
 
 	return
 }
@@ -46,16 +50,14 @@ func NewChainParams() (c ChainParameters) {
 // 操作交易费计划
 type FeeSchedule struct {
 	// mediator 创建费用
-	MediatorCreateFee          uint64                `json:"mediatorCreateFee"`
-	VoteMediatorFee            uint64                `json:"voteMediatorFee"`
-	TransferFee                TransferFeeParameters `json:"transferPtnFee"`
-	SetDesiredMediatorCountFee uint64                `json:"setDesiredMediatorCountFee"`
+	MediatorCreateFee uint64                `json:"mediatorCreateFee"`
+	AccountUpdateFee  uint64                `json:"accountUpdateFee"`
+	TransferFee       TransferFeeParameters `json:"transferPtnFee"`
 }
 
 func newFeeSchedule() (f FeeSchedule) {
 	f.MediatorCreateFee = DefaultMediatorCreateFee
-	f.VoteMediatorFee = DefaultVoteMediatorFee
-	f.SetDesiredMediatorCountFee = DefaultSetDesiredMediatorCountFee
+	f.AccountUpdateFee = DefaultAccountUpdateFee
 	f.TransferFee = newTransferFeeParameters()
 
 	return

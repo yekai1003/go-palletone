@@ -32,6 +32,7 @@ import (
 	"github.com/palletone/go-palletone/common/rpc"
 	mp "github.com/palletone/go-palletone/consensus/mediatorplugin"
 	"github.com/palletone/go-palletone/core/accounts"
+	"github.com/palletone/go-palletone/core/accounts/keystore"
 	"github.com/palletone/go-palletone/dag"
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/dag/state"
@@ -54,6 +55,10 @@ func (b *PtnApiBackend) Dag() dag.IDag {
 //func (b *PtnApiBackend) SignAndSendTransaction(addr common.Address, tx *modules.Transaction) error {
 //	return b.ptn.SignAndSendTransaction(addr, tx)
 //}
+
+func (b *PtnApiBackend) GetKeyStore() *keystore.KeyStore {
+	return b.ptn.GetKeyStore()
+}
 
 func (b *PtnApiBackend) TransferPtn(from, to string, amount decimal.Decimal,
 	text *string) (*mp.TxExecuteResult, error) {
@@ -129,14 +134,14 @@ func (b *PtnApiBackend) GetTxByTxid_back(txid string) (*ptnjson.GetTxIdResult, e
 	if err := hash.SetHexString(txid); err != nil {
 		return nil, err
 	}
-	tx, unitHash, _, _, err := b.ptn.dag.GetTransaction(hash)
+	tx, err := b.ptn.dag.GetTransaction(hash)
 	if err != nil {
 		return nil, err
 	}
-	var hex_hash string
-	if unitHash != (common.Hash{}) {
-		hex_hash = unitHash.String()
-	}
+	//var hex_hash string
+	//if unitHash != (common.Hash{}) {
+	//	hex_hash = unitHash.String()
+	//}
 	var txresult []byte
 	for _, msgcopy := range tx.TxMessages {
 		if msgcopy.App == modules.APP_DATA {
@@ -150,7 +155,7 @@ func (b *PtnApiBackend) GetTxByTxid_back(txid string) (*ptnjson.GetTxIdResult, e
 		Apptype:  "APP_DATA",
 		Content:  txresult,
 		Coinbase: true,
-		UnitHash: hex_hash,
+		UnitHash: tx.UnitHash.String(),
 	}
 	return txOutReply, nil
 }
@@ -159,7 +164,7 @@ func (b *PtnApiBackend) GetTxByTxid_back(txid string) (*ptnjson.GetTxIdResult, e
 //	return b.ptn.txPool.State().GetNonce(addr), nil
 //}
 
-func (b *PtnApiBackend) Stats() (pending int, queued int) {
+func (b *PtnApiBackend) Stats() (int, int, int) {
 	return b.ptn.txPool.Stats()
 }
 
@@ -269,10 +274,19 @@ func (b *PtnApiBackend) GetUnitNumber(hash common.Hash) uint64 {
 	return number.Index
 }
 
-// GetCanonicalHash
-//func (b *PtnApiBackend) GetCanonicalHash(number uint64) (common.Hash, error) {
-//	return b.ptn.dag.GetCanonicalHash(number)
-//}
+//
+func (b *PtnApiBackend) GetAssetTxHistory(asset *modules.Asset) ([]*ptnjson.TxHistoryJson, error) {
+	txs, err := b.ptn.dag.GetAssetTxHistory(asset)
+	if err != nil {
+		return nil, err
+	}
+	txjs := []*ptnjson.TxHistoryJson{}
+	for _, tx := range txs {
+		txj := ptnjson.ConvertTx2HistoryJson(tx, b.ptn.dag.GetUtxoEntry)
+		txjs = append(txjs, txj)
+	}
+	return txjs, nil
+}
 
 // Get state
 //func (b *PtnApiBackend) GetHeadHeaderHash() (common.Hash, error) {
@@ -339,11 +353,11 @@ func (b *PtnApiBackend) GetUnitTxsHashHex(hash common.Hash) ([]string, error) {
 }
 
 func (b *PtnApiBackend) GetTxByHash(hash common.Hash) (*ptnjson.TransactionJson, error) {
-	tx, hash, _, _, err := b.ptn.dag.GetTransaction(hash)
+	tx, err := b.ptn.dag.GetTransaction(hash)
 	if err != nil {
 		return nil, err
 	}
-	return ptnjson.ConvertTx02Json(tx, hash), nil
+	return ptnjson.ConvertTx02Json(tx.Transaction, tx.UnitHash), nil
 }
 
 func (b *PtnApiBackend) GetTxSearchEntry(hash common.Hash) (*ptnjson.TxSerachEntryJson, error) {
@@ -435,36 +449,21 @@ func (b *PtnApiBackend) GetAllUtxos() ([]*ptnjson.UtxoJson, error) {
 
 }
 
-//所有TokenInfo信息从创币合约读取
-//func (b *PtnApiBackend) GetAllTokenInfo() (*modules.AllTokenInfo, error) {
-//	all, err := b.ptn.dag.GetAllTokenInfo()
-//	if err != nil {
-//		return nil, err
-//	}
-//	return all, nil
-//}
-//func (b *PtnApiBackend) GetTokenInfo(key string) (*ptnjson.TokenInfoJson, error) {
-//	tokenInfo, err := b.ptn.dag.GetTokenInfo(key)
-//	if err != nil {
-//		return nil, err
-//	}
-//	tokenInfoJson := ptnjson.ConvertTokenInfo2Json(tokenInfo)
-//	return tokenInfoJson, nil
-//}
-
-//
-//func (b *PtnApiBackend) SaveTokenInfo(token *modules.TokenInfo) (*ptnjson.TokenInfoJson, error) {
-//	s_token, err := b.ptn.dag.SaveTokenInfo(token)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	tokenInfoJson := ptnjson.ConvertTokenInfo2Json(s_token)
-//	return tokenInfoJson, nil
-//}
-
-func (b *PtnApiBackend) GetAddrTransactions(addr string) (map[string]modules.Transactions, error) {
-	return b.ptn.dag.GetAddrTransactions(addr)
+func (b *PtnApiBackend) GetAddrTxHistory(addr string) ([]*ptnjson.TxHistoryJson, error) {
+	address, err := common.StringToAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+	txs, err := b.ptn.dag.GetAddrTransactions(address)
+	if err != nil {
+		return nil, err
+	}
+	txjs := []*ptnjson.TxHistoryJson{}
+	for _, tx := range txs {
+		txj := ptnjson.ConvertTx2HistoryJson(tx, b.ptn.dag.GetUtxoEntry)
+		txjs = append(txjs, txj)
+	}
+	return txjs, nil
 }
 
 //contract control
@@ -539,6 +538,13 @@ func (b *PtnApiBackend) ContractStopReqTx(from, to common.Address, daoAmount, da
 func (b *PtnApiBackend) ElectionVrf(id uint32) ([]byte, error) {
 	return b.ptn.contractPorcessor.ElectionVrfReq(id)
 }
+func (b *PtnApiBackend) UpdateJuryAccount(addr common.Address, pwd string) bool {
+	return b.ptn.contractPorcessor.UpdateJuryAccount(addr, pwd)
+}
+
+func (b *PtnApiBackend) GetJuryAccount() []common.Address {
+	return b.ptn.contractPorcessor.GetJuryAccount()
+}
 
 func (b *PtnApiBackend) GetCommon(key []byte) ([]byte, error) {
 	return b.ptn.dag.GetCommon(key)
@@ -557,7 +563,7 @@ func (b *PtnApiBackend) DecodeTx(hexStr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	txjson := ptnjson.ConvertTx2Json(tx)
+	txjson := ptnjson.ConvertTx2Json(tx, nil)
 	json, err := json.Marshal(txjson)
 	return string(json), err
 }

@@ -30,6 +30,12 @@ web3._extend({
         	params: 1,
         	inputFormatter: [null]
 		}),
+		new web3._extend.Method({
+			name: 'getUnitSummaryByNumber',
+        	call: 'dag_getUnitSummaryByNumber',
+        	params: 1,
+        	inputFormatter: [null]
+		}),
  		new web3._extend.Method({
             name: 'getUnstableUnits',
             call: 'dag_getUnstableUnits',
@@ -110,13 +116,7 @@ web3._extend({
             call: 'dag_getAllUtxos',
             params: 0,
             // inputFormatter: [null]
-        }),
-        new web3._extend.Method({
-            name: 'getAddrTransactions',
-            call: 'dag_getAddrTransactions',
-            params: 1,
-            // inputFormatter: [null]
-        }),
+        }),        
         new web3._extend.Method({
             name: 'getTokenInfo',
             call: 'dag_getTokenInfo',
@@ -152,6 +152,12 @@ web3._extend({
             name: 'getHeadFastUnitHash',
             call: 'dag_getHeadFastUnitHash',
             params: 0,
+            // inputFormatter: [null]
+        }),
+        new web3._extend.Method({
+            name: 'getFastUnitIndex',
+            call: 'dag_getFastUnitIndex',
+            params: 1,
             // inputFormatter: [null]
         }),
 	],

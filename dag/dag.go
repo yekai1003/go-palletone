@@ -21,6 +21,7 @@ package dag
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -31,7 +32,6 @@ import (
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/ptndb"
 	"github.com/palletone/go-palletone/configure"
-
 	dagcommon "github.com/palletone/go-palletone/dag/common"
 	"github.com/palletone/go-palletone/dag/dagconfig"
 	"github.com/palletone/go-palletone/dag/errors"
@@ -41,7 +41,6 @@ import (
 	"github.com/palletone/go-palletone/dag/txspool"
 	"github.com/palletone/go-palletone/tokenengine"
 	"github.com/palletone/go-palletone/validator"
-	"sort"
 )
 
 type Dag struct {
@@ -60,10 +59,10 @@ type Dag struct {
 	propRep       dagcommon.IPropRepository
 	validate      validator.Validator
 	ChainHeadFeed *event.Feed
-	// GenesisUnit   *Unit  // comment by Albert·Gou
+
 	Mutex           sync.RWMutex
-	Memdag          memunit.IMemDag                      // memory unit
-	PartitionMemDag map[modules.IDType16]memunit.IMemDag //其他分区的MemDag
+	Memdag          memunit.IMemDag                     // memory unit
+	PartitionMemDag map[modules.AssetId]memunit.IMemDag //其他分区的MemDag
 	// memutxo
 	// 按unit单元划分存储Utxo
 	//utxos_cache map[common.Hash]map[modules.OutPoint]*modules.Utxo
@@ -74,8 +73,9 @@ type Dag struct {
 	activeMediatorsUpdatedScope event.SubscriptionScope
 
 	// append by albert·gou 用于account 各种投票数据统计
-	mediatorVoteTally voteTallys
-	totalVotingStake  uint64
+	mediatorVoteTally      voteTallys
+	totalVotingStake       uint64
+	mediatorCountHistogram []uint64
 }
 
 //type MemUtxos map[modules.OutPoint]*modules.Utxo
@@ -85,7 +85,7 @@ func (d *Dag) IsEmpty() bool {
 	return !it.Next()
 }
 
-func (d *Dag) CurrentUnit(token modules.IDType16) *modules.Unit {
+func (d *Dag) CurrentUnit(token modules.AssetId) *modules.Unit {
 	return d.Memdag.GetLastMainchainUnit(token)
 }
 
@@ -94,7 +94,7 @@ func (d *Dag) GetMainCurrentUnit() *modules.Unit {
 	return d.Memdag.GetLastMainchainUnit(main_token)
 }
 
-func (d *Dag) GetCurrentUnit(assetId modules.IDType16) *modules.Unit {
+func (d *Dag) GetCurrentUnit(assetId modules.AssetId) *modules.Unit {
 	memUnit := d.GetCurrentMemUnit(assetId, 0)
 	curUnit := d.CurrentUnit(assetId)
 
@@ -107,7 +107,7 @@ func (d *Dag) GetCurrentUnit(assetId modules.IDType16) *modules.Unit {
 	return memUnit
 }
 
-func (d *Dag) GetCurrentMemUnit(assetId modules.IDType16, index uint64) *modules.Unit {
+func (d *Dag) GetCurrentMemUnit(assetId modules.AssetId, index uint64) *modules.Unit {
 	curUnit := d.Memdag.GetLastMainchainUnit(assetId)
 
 	return curUnit
@@ -275,7 +275,6 @@ func (d *Dag) InsertDag(units modules.Units, txpool txspool.ITxPool) (int, error
 		d.ApplyUnit(u)
 
 		// todo 应当和本地生产的unit统一接口，而不是直接存储
-		// modified by albert·gou
 		//if err := d.unstableUnitRep.SaveUnit(u, false); err != nil {
 		if err := d.SaveUnit(u, txpool, false); err != nil {
 			fmt.Errorf("Insert dag, save error: %s", err.Error())
@@ -313,7 +312,7 @@ func (d *Dag) GetUnitHashesFromHash(hash common.Hash, max uint64) []common.Hash 
 	return chain
 }
 
-// need add:   assetId modules.IDType16, onMain bool
+// need add:   assetId modules.AssetId, onMain bool
 func (d *Dag) HasHeader(hash common.Hash, number uint64) bool {
 	h, _ := d.GetHeaderByHash(hash)
 	return h != nil
@@ -327,7 +326,7 @@ func (d *Dag) Exists(hash common.Hash) bool {
 	exist, _ := d.unstableUnitRep.IsHeaderExist(hash)
 	return exist
 }
-func (d *Dag) CurrentHeader(token modules.IDType16) *modules.Header {
+func (d *Dag) CurrentHeader(token modules.AssetId) *modules.Header {
 	unit := d.CurrentUnit(token)
 	if unit != nil {
 		return unit.Header()
@@ -359,19 +358,15 @@ func (d *Dag) GetUnitTxsHash(hash common.Hash) ([]common.Hash, error) {
 //	}
 //	return tx, uhash, nil
 //}
-func (d *Dag) GetTransaction(hash common.Hash) (*modules.Transaction, common.Hash, uint64, uint64, error) {
+func (d *Dag) GetTransaction(hash common.Hash) (*modules.TransactionWithUnitInfo, error) {
 	return d.unstableUnitRep.GetTransaction(hash)
 }
 func (d *Dag) GetTransactionOnly(hash common.Hash) (*modules.Transaction, error) {
 	return d.unstableUnitRep.GetTransactionOnly(hash)
 }
 func (d *Dag) GetTxSearchEntry(hash common.Hash) (*modules.TxLookupEntry, error) {
-	unitHash, unitNumber, txIndex, err := d.unstableUnitRep.GetTxLookupEntry(hash)
-	return &modules.TxLookupEntry{
-		UnitHash:  unitHash,
-		UnitIndex: unitNumber,
-		Index:     txIndex,
-	}, err
+	txlookup, err := d.unstableUnitRep.GetTxLookupEntry(hash)
+	return txlookup, err
 }
 
 // InsertHeaderDag attempts to insert the given header chain in to the local
@@ -421,8 +416,8 @@ To get account token list and tokens's information
 //}
 //
 //func (d *Dag) WalletBalance(address common.Address, assetid []byte, uniqueid []byte, chainid uint64) (uint64, error) {
-//	newAssetid := modules.IDType16{}
-//	newUnitqueid := modules.IDType16{}
+//	newAssetid := modules.AssetId{}
+//	newUnitqueid := modules.AssetId{}
 //
 //	if len(assetid) != cap(newAssetid) {
 //		return 0, fmt.Errorf("Assetid lenth is wrong")
@@ -472,7 +467,7 @@ func NewDag(db ptndb.Database) (*Dag, error) {
 	unstableChain := memunit.NewMemDag(modules.PTNCOIN, false, db, unitRep, propRep)
 	tunitRep, tutxoRep, tstateRep := unstableChain.GetUnstableRepositories()
 	validate := validator.NewValidate(tunitRep, tutxoRep, tstateRep)
-	partitionMemdag := make(map[modules.IDType16]memunit.IMemDag)
+	partitionMemdag := make(map[modules.AssetId]memunit.IMemDag)
 	for _, ptoken := range dagconfig.DagConfig.GeSyncPartitionTokens() {
 		partitionMemdag[ptoken] = memunit.NewMemDag(ptoken, true, db, unitRep, propRep)
 	}
@@ -561,6 +556,7 @@ func NewDagForTest(db ptndb.Database, txpool txspool.ITxPool) (*Dag, error) {
 func (d *Dag) GetContract(id []byte) (*modules.Contract, error) {
 	return d.unstableStateRep.GetContract(id)
 }
+
 func (d *Dag) GetContractDeploy(tempId, contractId []byte, name string) (*modules.ContractDeployPayload, error) {
 	return d.unstableStateRep.GetContractDeploy(tempId, contractId, name)
 }
@@ -570,7 +566,6 @@ func (d *Dag) GetUnitNumber(hash common.Hash) (*modules.ChainIndex, error) {
 	return d.unstableUnitRep.GetNumberWithUnitHash(hash)
 }
 
-//
 //// GetCanonicalHash
 //func (d *Dag) GetCanonicalHash(number uint64) (common.Hash, error) {
 //	return d.unstableUnitRep.GetCanonicalHash(number)
@@ -621,6 +616,7 @@ func (d *Dag) GetUtxoEntry(outpoint *modules.OutPoint) (*modules.Utxo, error) {
 //	defer d.Mutex.RUnlock()
 //	return d.utxodb.GetUtxoPkScripHexByTxhash(txhash, mindex, outindex)
 //}
+
 func (d *Dag) GetUtxoView(tx *modules.Transaction) (*txspool.UtxoViewpoint, error) {
 	neededSet := make(map[modules.OutPoint]struct{})
 	//preout := modules.OutPoint{TxHash: tx.Hash()}
@@ -659,11 +655,13 @@ func (d *Dag) GetUtxoView(tx *modules.Transaction) (*txspool.UtxoViewpoint, erro
 
 	return view, err
 }
+
 func (d *Dag) GetUtxosOutViewbyTx(tx *modules.Transaction) *txspool.UtxoViewpoint {
 	view := txspool.NewUtxoViewpoint()
 	view.AddTxOuts(tx)
 	return view
 }
+
 func (d *Dag) GetUtxosOutViewbyUnit(unit *modules.Unit) *txspool.UtxoViewpoint {
 	txs := unit.Transactions()
 	view := txspool.NewUtxoViewpoint()
@@ -707,18 +705,18 @@ func (d *Dag) GetTxFromAddress(tx *modules.Transaction) ([]common.Address, error
 	return d.unstableUnitRep.GetTxFromAddress(tx)
 }
 
-//func (d *Dag) GetAddrOutput(addr string) ([]modules.Output, error) {
-//	return d.unstableUnitRep.GetAddrOutput(addr)
-//}
+func (d *Dag) GetAssetTxHistory(asset *modules.Asset) ([]*modules.TransactionWithUnitInfo, error) {
+	return d.unstableUnitRep.GetAssetTxHistory(asset)
+}
 
 func (d *Dag) GetAddr1TokenUtxos(addr common.Address, asset *modules.Asset) (map[modules.OutPoint]*modules.Utxo, error) {
-	all, err := d.unstableUtxoRep.GetAddrUtxos(addr)
+	all, err := d.unstableUtxoRep.GetAddrUtxos(addr, asset)
 	return all, err
 }
 
 func (d *Dag) GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modules.Utxo, error) {
 
-	all, err := d.unstableUtxoRep.GetAddrUtxos(addr)
+	all, err := d.unstableUtxoRep.GetAddrUtxos(addr, nil)
 
 	return all, err
 }
@@ -728,7 +726,7 @@ func (d *Dag) GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modules.U
 //	return d.unstableUtxoRep.SaveUtxoView(view.Entries())
 //}
 
-func (d *Dag) GetAddrTransactions(addr string) (map[string]modules.Transactions, error) {
+func (d *Dag) GetAddrTransactions(addr common.Address) ([]*modules.TransactionWithUnitInfo, error) {
 	return d.unstableUnitRep.GetAddrTransactions(addr)
 }
 
@@ -747,14 +745,13 @@ func (d *Dag) GetContractStatesById(id []byte) (map[string]*modules.ContractStat
 	return d.unstableStateRep.GetContractStatesById(id)
 }
 
+func (d *Dag) GetContractStatesByPrefix(id []byte, prefix string) (map[string]*modules.ContractStateValue, error) {
+	return d.unstableStateRep.GetContractStatesByPrefix(id, prefix)
+}
+
 func (d *Dag) CreateUnit(mAddr *common.Address, txpool txspool.ITxPool, t time.Time) ([]modules.Unit, error) {
 	return d.unstableUnitRep.CreateUnit(mAddr, txpool, t)
 }
-
-//modified by Albert·Gou
-//func (d *Dag) SaveUnit4GenesisInit(unit *modules.Unit, txpool txspool.ITxPool) error {
-//	return d.stableUnitRep.SaveUnit(unit, true)
-//}
 
 func (d *Dag) saveHeader(header *modules.Header) error {
 	unit := &modules.Unit{UnitHeader: header}
@@ -791,7 +788,7 @@ func (d *Dag) SaveUnit(unit *modules.Unit, txpool txspool.ITxPool, isGenesis boo
 			return errors.ErrUnitExist //fmt.Errorf("SaveDag, unit(%s) is already existing.", unit.Hash().String())
 		}
 		// step2. validate unit
-		err := d.validate.ValidateUnitExceptGroupSig(unit)
+		err := d.validateUnit(unit)
 		if err != nil {
 			return fmt.Errorf("SaveDag, validate unit error, err=%s", err.Error())
 		}
@@ -930,16 +927,6 @@ func (d *Dag) SaveUnit(unit *modules.Unit, txpool txspool.ITxPool, isGenesis boo
 //	return true, nil
 //}
 
-//func (d *Dag) GetAccountMediatorVote(address common.Address) []common.Address {
-//	// todo
-//	bAddress := d.statedb.GetAccountVoteInfo(address, vote.TYPE_MEDIATOR)
-//	res := []common.Address{}
-//	for _, b := range bAddress {
-//		res = append(res, common.BytesToAddress(b))
-//	}
-//	return res
-//}
-
 func (d *Dag) CreateUnitForTest(txs modules.Transactions) (*modules.Unit, error) {
 	// get current unit
 	token := modules.PTNCOIN
@@ -957,10 +944,10 @@ func (d *Dag) CreateUnitForTest(txs modules.Transactions) (*modules.Unit, error)
 	unitHeader := modules.Header{
 		ParentsHash: []common.Hash{currentUnit.UnitHash},
 		//Authors:      nil,
-		GroupSign:    make([]byte, 0),
-		GroupPubKey:  make([]byte, 0),
-		Number:       height,
-		Creationdate: time.Now().Unix(),
+		GroupSign:   make([]byte, 0),
+		GroupPubKey: make([]byte, 0),
+		Number:      height,
+		Time:        time.Now().Unix(),
 	}
 
 	sAddr := "P1NsG3kiKJc87M6Di6YriqHxqfPhdvxVj2B"
@@ -1003,56 +990,13 @@ func (d *Dag) GetContractTpl(templateID []byte) (version *modules.StateVersion, 
 	return d.unstableStateRep.GetContractTpl(templateID)
 }
 
-func (d *Dag) GetCurrentUnitIndex(token modules.IDType16) (*modules.ChainIndex, error) {
+func (d *Dag) GetCurrentUnitIndex(token modules.AssetId) (*modules.ChainIndex, error) {
 	currentUnit := d.CurrentUnit(token)
 	//	return d.GetUnitNumber(currentUnitHash)
 	return currentUnit.Number(), nil
 }
 
-//@Yiran save utxo snapshot when new mediator cycle begin
-// unit index MUST to be  integer multiples of  termInterval.
-//func (d *Dag) SaveUtxoSnapshot() error {
-//	currentUnitIndex, err := d.GetCurrentUnitIndex()
-//	if err != nil {
-//		return err
-//	}
-//	return d.utxodb.SaveUtxoSnapshot(currentUnitIndex)
-//}
-
-//@Yiran Get last utxo snapshot
-// must calling after SaveUtxoSnapshot call , before this mediator cycle end.
-// called by GenerateVoteResult
-//func (d *Dag) GetUtxoSnapshot() (*[]modules.Utxo, error) {
-//	unitIndex, err := d.GetCurrentUnitIndex()
-//	if err != nil {
-//		return nil, err
-//	}
-//	unitIndex.Index -= unitIndex.Index % modules.TERMINTERVAL
-//	return d.utxodb.GetUtxoEntities(unitIndex)
-//}
-
-////@Yiran
-//func (d *Dag) GenerateVoteResult() (*[]storage.AddressVote, error) {
-//	AddressVoteBox := storage.NewAddressVoteBox()
-//
-//	utxos, err := d.utxodb.GetAllUtxos()
-//	if err != nil {
-//		return nil, err
-//	}
-//	for _, utxo := range utxos {
-//		if utxo.Asset.AssetId == modules.PTNCOIN {
-//			utxoHolder, err := tokenengine.GetAddressFromScript(utxo.PkScript)
-//			if err != nil {
-//				return nil, err
-//			}
-//			AddressVoteBox.AddToBoxIfNotVoted(utxoHolder, utxo.VoteResult)
-//		}
-//	}
-//	AddressVoteBox.Sort()
-//	return &AddressVoteBox.Candidates, nil
-//}
-
-//func UtxoFilter(utxos map[modules.OutPoint]*modules.Utxo, assetId modules.IDType16) []*modules.Utxo {
+//func UtxoFilter(utxos map[modules.OutPoint]*modules.Utxo, assetId modules.AssetId) []*modules.Utxo {
 //	res := make([]*modules.Utxo, 0)
 //	for _, utxo := range utxos {
 //		if utxo.Asset.AssetId == assetId {
@@ -1060,68 +1004,6 @@ func (d *Dag) GetCurrentUnitIndex(token modules.IDType16) (*modules.ChainIndex, 
 //		}
 //	}
 //	return res
-//}
-
-////@Yiran
-//func (d *Dag) UpdateActiveMediators() error {
-//	var TermInterval uint64 = 50
-//	MediatorNumber := d.ActiveMediatorsCount()
-//	// <1> Get election unit
-//	hash := d.CurrentUnit().UnitHash
-//	index, err := d.GetUnitNumber(hash)
-//	if err != nil {
-//		return err
-//	}
-//	if index.Index <= TermInterval {
-//		return errors.New("first election must wait until first term period end")
-//		//adjust TermInterval to fit the unit number
-//		//TermInterval = index.Index
-//	}
-//	index.Index -= index.Index % TermInterval
-//	d.GetUnitByNumber(index).
-//
-//	//// <2> Get all votes belonged to this election period
-//	//voteBox := storage.AddressVoteBox{}
-//	//for i := TermInterval; i > 0; i-- { // for each unit in period.
-//	//	for _, Tx := range d.GetUnitByNumber(index).Txs { //for each transaction in unit
-//	//		voter := Tx.TxMessages.GetInputAddress()
-//	//		voteTo := Tx.TxMessages.GetVoteResult()
-//	//		voteBox.AddToBoxIfNotVoted(voter, voteTo)
-//	//	}
-//	//}
-//
-//	// <3> calculate vote result
-//	addresses := voteBox.Head(MediatorNumber) //sort by candidates vote number & return the addresses of the top n account
-//
-//	// <4> create active mediators from addresses & update globalProperty
-//	activeMediators := make(map[common.Address]core.Mediator, 0)
-//	for _, addr := range (addresses) {
-//		newmediator := *d.GetGlobalProp().GetActiveMediator(addr)
-//		activeMediators[addr] = newmediator
-//	}
-//
-//	return nil
-//}
-
-//GetElectedMediatorsAddress YiRan@
-//func (dag *Dag) GetElectedMediatorsAddress() (map[string]uint64, error) {
-//	//gp, err := dag.propdb.RetrieveGlobalProp()
-//	//if err != nil {
-//	//	return nil, err
-//	//}
-//	//MediatorNumber := gp.ActiveMediatorsCount()
-//	return dag.statedb.GetSortedMediatorVote(0)
-//}
-
-// UpdateMediator
-//func (d *Dag) UpdateMediator() error {
-//	mas, err := d.GetElectedMediatorsAddress()
-//	if err != nil {
-//		return err
-//	}
-//	fmt.Println(mas)
-//	//TODO
-//	return nil
 //}
 
 // dag's common geter
@@ -1134,7 +1016,7 @@ func (d *Dag) GetCommonByPrefix(prefix []byte) map[string][]byte {
 	return d.unstableUnitRep.GetCommonByPrefix(prefix)
 }
 
-//func (d *Dag) GetCurrentChainIndex(assetId modules.IDType16) (*modules.ChainIndex, error) {
+//func (d *Dag) GetCurrentChainIndex(assetId modules.AssetId) (*modules.ChainIndex, error) {
 //	return d.unstableStateRep.GetCurrentChainIndex(assetId)
 //}
 
@@ -1239,7 +1121,7 @@ func (d *Dag) GetFileInfo(filehash []byte) ([]*modules.FileInfo, error) {
 func (d *Dag) GetLightHeaderByHash(headerHash common.Hash) (*modules.Header, error) {
 	return nil, nil
 }
-func (d *Dag) GetLightChainHeight(assetId modules.IDType16) uint64 {
+func (d *Dag) GetLightChainHeight(assetId modules.AssetId) uint64 {
 	return uint64(0)
 }
 func (d *Dag) InsertLightHeader(headers []*modules.Header) (int, error) {
@@ -1257,4 +1139,13 @@ func (d *Dag) GetAllLeafNodes() ([]*modules.Header, error) {
 	// step1: get all AssetId
 
 	return []*modules.Header{}, nil
+}
+
+func (d *Dag) UpdateSysParams() error {
+	version := &modules.StateVersion{}
+	//Height: &modules.ChainIndex{Index: 123, IsMain: true}, TxIndex: 1
+	unit := d.GetMainCurrentUnit()
+	version.Height = unit.UnitHeader.Number
+	version.TxIndex = 0
+	return d.stableStateRep.UpdateSysParams(version)
 }

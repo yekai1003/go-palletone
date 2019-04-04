@@ -11,6 +11,7 @@
    You should have received a copy of the GNU General Public License
    along with go-palletone.  If not, see <http://www.gnu.org/licenses/>.
 */
+
 /*
  * @author PalletOne core developers <dev@pallet.one>
  * @date 2018
@@ -60,7 +61,7 @@ type IUtxoRepository interface {
 	GetUtxoEntry(outpoint *modules.OutPoint) (*modules.Utxo, error)
 	GetAllUtxos() (map[modules.OutPoint]*modules.Utxo, error)
 	GetAddrOutpoints(addr common.Address) ([]modules.OutPoint, error)
-	GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modules.Utxo, error)
+	GetAddrUtxos(addr common.Address, asset *modules.Asset) (map[modules.OutPoint]*modules.Utxo, error)
 	ReadUtxos(addr common.Address, asset modules.Asset) (map[modules.OutPoint]*modules.Utxo, uint64)
 	GetUxto(txin modules.Input) *modules.Utxo
 	UpdateUtxo(txHash common.Hash, payment *modules.PaymentPayload, msgIndex uint32) error
@@ -85,8 +86,8 @@ func (repository *UtxoRepository) GetAllUtxos() (map[modules.OutPoint]*modules.U
 func (repository *UtxoRepository) GetAddrOutpoints(addr common.Address) ([]modules.OutPoint, error) {
 	return repository.utxodb.GetAddrOutpoints(addr)
 }
-func (repository *UtxoRepository) GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modules.Utxo, error) {
-	return repository.utxodb.GetAddrUtxos(addr)
+func (repository *UtxoRepository) GetAddrUtxos(addr common.Address, asset *modules.Asset) (map[modules.OutPoint]*modules.Utxo, error) {
+	return repository.utxodb.GetAddrUtxos(addr, asset)
 }
 func (repository *UtxoRepository) SaveUtxoView(view map[modules.OutPoint]*modules.Utxo) error {
 	return repository.utxodb.SaveUtxoView(view)
@@ -632,15 +633,19 @@ func (repository *UtxoRepository) ComputeTxAward(tx *modules.Transaction, dagdb 
 				//1.通过交易hash获取单元hash
 				//txin.PreviousOutPoint.TxHash 获取txhash
 				//dagdb.GetTransaction()
-				_, unitHash, _, _, err := dagdb.GetTransaction(txin.PreviousOutPoint.TxHash)
+				txlookup, err := dagdb.GetTxLookupEntry(txin.PreviousOutPoint.TxHash)
 				if err != nil {
 					return 0, err
 				}
 				//2.通过单元hash获取单元信息
-				header, _ := dagdb.GetHeaderByHash(unitHash)
+				//header, _ := dagdb.GetHeaderByHash(unitHash)
 				//3.通过单元获取头部信息中的时间戳
-				timestamp := header.Creationdate
-				award := award2.GetAwardsWithCoins(utxo.Amount, timestamp)
+				timestamp := int64(txlookup.Timestamp)
+				depositRate, _, err := repository.statedb.GetConfig("DepositRate")
+				if err != nil {
+					return 0, err
+				}
+				award := award2.GetAwardsWithCoins(utxo.Amount, timestamp, string(depositRate))
 				awards += award
 			}
 			return awards, nil
@@ -665,18 +670,3 @@ func ComputeRewards() uint64 {
 	}
 	return rewards
 }
-
-//func IsCoinBase(tx *modules.Transaction) bool {
-//	if len(tx.TxMessages) != 1 {
-//		return false
-//	}
-//	msg, ok := tx.TxMessages[0].Payload.(*modules.PaymentPayload)
-//	if !ok {
-//		return false
-//	}
-//	prevOut := msg.Inputs[0].PreviousOutPoint
-//	if prevOut.TxHash != (common.Hash{}) {
-//		return false
-//	}
-//	return true
-//}

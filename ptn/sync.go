@@ -174,7 +174,7 @@ func (pm *ProtocolManager) syncall() {
 	//YING 0x601892ec080000000000000000000000
 	//YOU 0x4000af9e080000000000000000000000
 
-	asset, err := modules.NewAsset(strings.ToUpper(pm.SubProtocols[0].Name), modules.AssetType_FungibleToken, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, modules.IDType16{})
+	asset, err := modules.NewAsset(strings.ToUpper(pm.SubProtocols[0].Name), modules.AssetType_FungibleToken, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, modules.UniqueIdType_Null, modules.UniqueId{})
 	if err != nil {
 		log.Error("ProtocolManager syncall asset err", err)
 		return
@@ -207,7 +207,7 @@ func (pm *ProtocolManager) lightsync(peer *peer) {
 }
 
 // synchronise tries to sync up our local block chain with a remote peer.
-func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.IDType16) {
+func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.AssetId) {
 	// Short circuit if no peers are available
 	if peer == nil {
 		log.Debug("ProtocolManager synchronise peer is nil")
@@ -267,7 +267,7 @@ func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.IDType16) {
 	}
 }
 
-func (pm *ProtocolManager) lightsynchronise(peer *peer, assetId modules.IDType16) {
+func (pm *ProtocolManager) lightsynchronise(peer *peer, assetId modules.AssetId) {
 	// Short circuit if no peers are available
 	if peer == nil {
 		log.Debug("ProtocolManager light synchronise peer is nil")
@@ -278,16 +278,15 @@ func (pm *ProtocolManager) lightsynchronise(peer *peer, assetId modules.IDType16
 
 	// Make sure the peer's TD is higher than our own
 	//TODO must recover
-	//currentHeader := pm.dag.CurrentHeader(assetId)
 	currentHeader := pm.dag.CurrentHeader(assetId)
-	//if currentHeader == nil {
-	//	log.Info("light synchronise current header is nil")
-	//	return
-	//}
-	//hash, number := peer.LightHead(assetId)
-	//if common.EmptyHash(hash) || (!common.EmptyHash(hash) && currentHeader.Number.Index > number.Index) {
-	//	return
-	//}
+	if currentHeader == nil {
+		log.Info("light synchronise current header is nil")
+		return
+	}
+	hash, number := peer.LightHead(assetId)
+	if common.EmptyHash(hash) || (!common.EmptyHash(hash) && currentHeader.Number.Index > number.Index) {
+		return
+	}
 
 	// Otherwise try to sync with the downloader
 	mode := downloader.LightSync
@@ -298,19 +297,18 @@ func (pm *ProtocolManager) lightsynchronise(peer *peer, assetId modules.IDType16
 		return
 	}
 
-	if atomic.LoadUint32(&pm.fastSync) == 1 {
-		log.Debug("Fast sync complete, auto disabling")
-		atomic.StoreUint32(&pm.fastSync, 0)
-	}
-	atomic.StoreUint32(&pm.acceptTxs, 1) // Mark initial sync done
+	//if atomic.LoadUint32(&pm.fastSync) == 1 {
+	//	log.Debug("Fast sync complete, auto disabling")
+	//	atomic.StoreUint32(&pm.fastSync, 0)
+	//}
 
-	head := pm.dag.CurrentUnit(assetId)
-	if head != nil && head.UnitHeader.Number.Index > 0 {
-		go pm.BroadcastUnit(head, false /*, noBroadcastMediator*/)
+	head := pm.dag.CurrentHeader(assetId)
+	if head != nil && head.Number.Index > 0 {
+		go pm.BroadcastLocalLightHeader(head)
 	}
 }
 
-func (pm *ProtocolManager) getMaxNodes(headers []*modules.Header, assetId modules.IDType16) (*modules.Header, error) {
+func (pm *ProtocolManager) getMaxNodes(headers []*modules.Header, assetId modules.AssetId) (*modules.Header, error) {
 	size := len(headers)
 	if size == 0 {
 		return nil, nil

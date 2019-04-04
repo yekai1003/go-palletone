@@ -20,33 +20,42 @@ package jury
 
 import (
 	"encoding/json"
-	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/common"
+	"github.com/palletone/go-palletone/dag/modules"
 )
 
 type ContractEventType uint8
-type EventType uint8
+type ElectionEventType uint8
+type AdapterEventType uint32
 
 const (
 	CONTRACT_EVENT_EXEC   ContractEventType = 1 //合约执行，系统合约由Mediator完成，用户合约由Jury完成
 	CONTRACT_EVENT_SIG                      = 2 //多Jury执行合约并签名转发确认，由Jury接收并处理
 	CONTRACT_EVENT_COMMIT                   = 4 //提交给Mediator进行验证确认并写到交易池
 )
-
 const (
-	ELECTION_EVENT_REQUEST EventType = 1
-	ELECTION_EVENT_RESULT            = 2
+	ELECTION_EVENT_REQUEST ElectionEventType = 1
+	ELECTION_EVENT_RESULT                    = 2
+)
+const (
+	ADAPTER_EVENT_REQUEST AdapterEventType = 1
+	ADAPTER_EVENT_RESULT                   = 2
 )
 
 type ElectionInf struct {
+	VData     []byte      //vrf data
 	AddrHash  common.Hash //common.Address将地址hash后，返回给请求节点
 	Proof     []byte      //vrf proof
 	PublicKey []byte      //alg.PublicKey, rlp not support
 }
+type AdapterInf struct {
+	AData []byte //adapter data
+	//todo add
+}
 
 //contract
 type ContractEvent struct {
-	Ele      []ElectionInf
+	Ele []ElectionInf
 
 	CType ContractEventType
 	Tx    *modules.Transaction
@@ -61,15 +70,13 @@ type ElectionResultEvent struct {
 	ReqId common.Hash
 	Ele   ElectionInf
 }
-
 type ElectionEvent struct {
-	EType EventType   `json:"etype"`
-	Event interface{} `json:"event"`
+	EType ElectionEventType `json:"etype"`
+	Event interface{}       `json:"event"`
 }
-
 type ElectionEventBytes struct {
-	EType EventType `json:"etype"`
-	Event []byte    `json:"event"`
+	EType ElectionEventType `json:"etype"`
+	Event []byte            `json:"event"`
 }
 
 func (es *ElectionEventBytes) ToElectionEvent() (*ElectionEvent, error) {
@@ -100,4 +107,20 @@ func (ev *ElectionEvent) ToElectionEventBytes() (*ElectionEventBytes, error) {
 	es.EType = ev.EType
 	es.Event = byteJson
 	return es, err
+}
+
+//Adapter
+type AdapterEvent struct {
+	AType AdapterEventType `json:"atype"`
+	Event interface{}      `json:"event"`
+}
+type AdapterRequestEvent struct {
+	contractId common.Address `json:"contractId"`
+	data       []byte         `json:"data"` //change
+	sig        []byte
+	pubkey     []byte
+}
+type AdapterResultEvent struct {
+	contractId common.Address `json:"contractId"`
+	data       []byte         `json:"data"` //change
 }

@@ -32,12 +32,18 @@ type UnitJson struct {
 	Txs        []*TxJson          `json:"transactions"` // transaction list
 	UnitHash   common.Hash        `json:"unit_hash"`    // unit hash
 	UnitSize   common.StorageSize `json:"unit_size"`    // unit size
-
+}
+type FastUnitJson struct {
+	FastHash    common.Hash `json:"fast_hash"`
+	FastIndex   uint64      `json:"fast_index"`
+	StableHash  common.Hash `json:"stable_hash"`
+	StableIndex uint64      `json:"stable_index"`
 }
 type HeaderJson struct {
 	ParentsHash []common.Hash `json:"parents_hash"`
 	//AssetIDs      []string       `json:"assets"`
 	AuthorAddress string         `json:"mediator_address"`
+	AuthorPubKey  string         `json:"mediator_pubkey"`
 	AuthorSign    string         `json:"mediator_sign"` // the unit creation authors
 	GroupSign     string         `json:"groupSign"`     // 群签名, 用于加快单元确认速度
 	GroupPubKey   string         `json:"groupPubKey"`   // 群公钥, 用于验证群签名
@@ -61,7 +67,7 @@ func ConvertUnit2Json(unit *modules.Unit) *UnitJson {
 	}
 
 	for _, tx := range unit.Txs {
-		txjson := ConvertTx2Json(tx)
+		txjson := ConvertTx2Json(tx, nil)
 		json.Txs = append(json.Txs, &txjson)
 	}
 	return json
@@ -69,16 +75,17 @@ func ConvertUnit2Json(unit *modules.Unit) *UnitJson {
 func convertUnitHeader2Json(header *modules.Header) *HeaderJson {
 	json := &HeaderJson{
 		ParentsHash:   header.ParentsHash,
-		AuthorAddress: header.Authors.Address.String(),
-		AuthorSign:    hex.EncodeToString(append(header.Authors.R, header.Authors.S...)),
+		AuthorAddress: header.Authors.Address().String(),
+		AuthorPubKey:  hex.EncodeToString(header.Authors.PubKey),
+		AuthorSign:    hex.EncodeToString(header.Authors.Signature),
 		GroupSign:     hex.EncodeToString(header.GroupSign),
 		GroupPubKey:   hex.EncodeToString(header.GroupPubKey),
 		TxRoot:        header.TxRoot,
 		Extra:         hex.EncodeToString(header.Extra),
-		CreationTime:  time.Now(), // TODO: header.Creationdate
+		CreationTime:  time.Now(), // TODO: header.Time
 	}
 	json.Number = ChainIndexJson{
-		AssetID: header.Number.AssetID.ToAssetId(),
+		AssetID: header.Number.AssetID.String(),
 		IsMain:  header.Number.IsMain,
 		Index:   header.Number.Index,
 	}
@@ -90,7 +97,7 @@ type UnitSummaryJson struct {
 	Txs        []common.Hash      `json:"transactions"` // transaction list
 	UnitHash   common.Hash        `json:"unit_hash"`    // unit hash
 	UnitSize   common.StorageSize `json:"unit_size"`    // unit size
-
+	TxCount    int                `json:"transaction_count"`
 }
 
 func ConvertUnit2SummaryJson(unit *modules.Unit) *UnitSummaryJson {
@@ -99,6 +106,7 @@ func ConvertUnit2SummaryJson(unit *modules.Unit) *UnitSummaryJson {
 		UnitSize:   unit.Size(),
 		UnitHeader: convertUnitHeader2Json(unit.UnitHeader),
 		Txs:        []common.Hash{},
+		TxCount:    len(unit.Txs),
 	}
 
 	for _, tx := range unit.Txs {

@@ -29,12 +29,14 @@ import (
 )
 
 type GlobalPropBase struct {
-	ChainParameters core.ChainParameters // 区块链网络参数
+	ImmutableParameters core.ImmutableChainParameters // 不可改变的区块链网络参数
+	ChainParameters     core.ChainParameters          // 区块链网络参数
 }
 
 func NewGlobalPropBase() *GlobalPropBase {
 	return &GlobalPropBase{
-		ChainParameters: core.NewChainParams(),
+		ImmutableParameters: core.NewImmutChainParams(),
+		ChainParameters:     core.NewChainParams(),
 	}
 }
 
@@ -77,9 +79,9 @@ type DynamicGlobalProperty struct {
 	// 最低位表示最近一个slot， 初始值全为1。
 	RecentSlotsFilled uint64
 
-	//LastIrreversibleUnitNum uint32
-	//NewestUnit     map[IDType16]*UnitProperty
-	//LastStableUnit map[IDType16]*UnitProperty
+	LastIrreversibleUnitNum uint64
+	//NewestUnit     map[AssetId]*UnitProperty
+	//LastStableUnit map[AssetId]*UnitProperty
 }
 type UnitProperty struct {
 	Hash      common.Hash // 最近的单元hash
@@ -101,17 +103,17 @@ func NewDynGlobalProp() *DynamicGlobalProperty {
 
 		RecentSlotsFilled: ^uint64(0),
 
-		//LastIrreversibleUnitNum: 0,
-		//NewestUnit:     map[IDType16]*UnitProperty{},
-		//LastStableUnit: map[IDType16]*UnitProperty{},
+		LastIrreversibleUnitNum: 0,
+		//NewestUnit:     map[AssetId]*UnitProperty{},
+		//LastStableUnit: map[AssetId]*UnitProperty{},
 	}
 }
 
 //func (gdp *DynamicGlobalProperty) SetNewestUnit(header *Header) {
-//	gdp.NewestUnit[header.Number.AssetID] = &UnitProperty{header.Hash(), header.Number, header.Creationdate}
+//	gdp.NewestUnit[header.Number.AssetID] = &UnitProperty{header.Hash(), header.Number, header.Time}
 //}
 //func (gdp *DynamicGlobalProperty) SetLastStableUnit(header *Header) {
-//	gdp.LastStableUnit[header.Number.AssetID] = &UnitProperty{header.Hash(), header.Number, header.Creationdate}
+//	gdp.LastStableUnit[header.Number.AssetID] = &UnitProperty{header.Hash(), header.Number, header.Time}
 //}
 
 const TERMINTERVAL = 50 //DEBUG:50, DEPLOY:15000
@@ -137,22 +139,6 @@ func calcThreshold(aSize int) int {
 		core.PalletOne100Percent
 
 	return aSize - offset
-}
-
-func (gp *GlobalProperty) IsActiveJury(add common.Address) bool {
-	return true //todo for test
-
-	//return gp.ActiveJuries[add]
-}
-
-func (gp *GlobalProperty) GetActiveJuries() []common.Address {
-	juries := make([]common.Address, 0, len(gp.ActiveJuries))
-	for addr, _ := range gp.ActiveJuries {
-		juries = append(juries, addr)
-	}
-	sortAddress(juries)
-
-	return juries
 }
 
 func (gp *GlobalProperty) IsActiveMediator(add common.Address) bool {
@@ -208,6 +194,7 @@ func InitGlobalProp(genesis *core.Genesis) *GlobalProperty {
 
 	log.Debug("initialize chain parameters...")
 	gp.ChainParameters = genesis.InitialParameters
+	gp.ImmutableParameters = genesis.ImmutableParameters
 
 	log.Debug("Set active mediators...")
 	// Set active mediators
@@ -233,20 +220,4 @@ func InitDynGlobalProp(genesis *Unit) *DynamicGlobalProperty {
 	//dgp.SetNewestUnit(genesis.Header())
 	//dgp.SetLastStableUnit(genesis.Header())
 	return dgp
-}
-
-// UpdateDynGlobalProp, update global dynamic data
-// @author Albert·Gou
-func (dgp *DynamicGlobalProperty) UpdateDynGlobalProp(unit *Unit, missedUnits uint64) {
-	//dgp.HeadUnitNum = unit.NumberU64()
-	//dgp.HeadUnitHash = unit.Hash()
-	//dgp.HeadUnitTime = unit.Timestamp()
-	//dgp.SetNewestUnit(unit.Header())
-
-	dgp.LastMediator = unit.Author()
-	dgp.IsShuffledSchedule = false
-
-	dgp.RecentSlotsFilled = dgp.RecentSlotsFilled<<(missedUnits+1) + 1
-
-	dgp.CurrentASlot += missedUnits + 1
 }

@@ -31,7 +31,7 @@ import (
 
 type RwSetTxSimulator struct {
 	chainIndex              *modules.ChainIndex
-	txid                    string
+	txid                    common.Hash
 	rwsetBuilder            *RWSetBuilder
 	dag                     dag.IDag
 	writePerformed          bool
@@ -44,21 +44,18 @@ type VersionedValue struct {
 	Version *Version
 }
 
-func NewBasedTxSimulator(idag dag.IDag, txid string) *RwSetTxSimulator {
+func NewBasedTxSimulator(idag dag.IDag, hash common.Hash) *RwSetTxSimulator {
 	rwsetBuilder := NewRWSetBuilder()
 	unit := idag.GetCurrentUnit(modules.PTNCOIN)
 	cIndex := unit.Header().Number
-	log.Debugf("constructing new tx simulator txid = [%s]", txid)
-	return &RwSetTxSimulator{cIndex, txid, rwsetBuilder, idag, false, false, false}
+	log.Debugf("constructing new tx simulator txid = [%s]", hash.String())
+	return &RwSetTxSimulator{cIndex, hash, rwsetBuilder, idag, false, false, false}
 }
 
 func (s *RwSetTxSimulator) GetConfig(name string) ([]byte, error) {
 	val, _, err := s.dag.GetConfig(name)
 	if err != nil {
 		return nil, err
-	}
-	if val == nil {
-		return nil, nil
 	}
 	return val, nil
 }
@@ -88,6 +85,32 @@ func (s *RwSetTxSimulator) GetState(contractid []byte, ns string, key string) ([
 	//return testValue, nil
 	return val, nil
 }
+func (s *RwSetTxSimulator) GetStatesByPrefix(contractid []byte, ns string, prefix string) ([]*modules.KeyValue, error) {
+	if err := s.CheckDone(); err != nil {
+		return nil, err
+	}
+
+	data, err := s.dag.GetContractStatesByPrefix(contractid, prefix)
+
+	if err != nil {
+		log.Debugf("get value from db[%s] failed,prefix:%s", ns, prefix)
+		return nil, nil
+		//errstr := fmt.Sprintf("GetContractState [%s]-[%s] failed", ns, key)
+		//		//return nil, errors.New(errstr)
+	}
+	result := []*modules.KeyValue{}
+	for key, row := range data {
+		kv := &modules.KeyValue{Key: key, Value: row.Value}
+		result = append(result, kv)
+		if s.rwsetBuilder != nil {
+			s.rwsetBuilder.AddToReadSet(ns, key, row.Version)
+		}
+	}
+
+	log.Debugf("RW:GetStatesByPrefix,ns[%s]--contractid[%x]---prefix[%s]", ns, contractid, prefix)
+
+	return result, nil
+}
 
 // GetState implements method in interface `ledger.TxSimulator`
 func (s *RwSetTxSimulator) GetTimestamp(contractid []byte, ns string, rangeNumber uint32) ([]byte, error) {
@@ -102,7 +125,7 @@ func (s *RwSetTxSimulator) GetTimestamp(contractid []byte, ns string, rangeNumbe
 		return nil, errors.New("GetHeaderByNumber failed" + err.Error())
 	}
 
-	return []byte(fmt.Sprintf("%d", timeHeader.Creationdate)), nil
+	return []byte(fmt.Sprintf("%d", timeHeader.Time)), nil
 }
 func (s *RwSetTxSimulator) SetState(ns string, key string, value []byte) error {
 	//log.Debugf("RW:SetState,ns[%s]--key[%s]---value[%s]", ns, key, value)
@@ -123,7 +146,6 @@ func (s *RwSetTxSimulator) SetState(ns string, key string, value []byte) error {
 
 // DeleteState implements method in interface `ledger.TxSimulator`
 func (s *RwSetTxSimulator) DeleteState(ns string, key string) error {
-	//fmt.Println("DeleteState(ns string, key string)===>\n\n", ns, key)
 	return s.SetState(ns, key, nil)
 }
 
@@ -131,7 +153,7 @@ func (s *RwSetTxSimulator) GetRwData(ns string) (map[string]*KVRead, map[string]
 	var rd map[string]*KVRead
 	var wt map[string]*KVWrite
 
-	log.Infof("ns=%s", ns)
+	log.Info("GetRwData", "ns info", ns)
 
 	if s.rwsetBuilder != nil {
 		if s.rwsetBuilder.pubRwBuilderMap != nil {
@@ -162,8 +184,8 @@ func (s *RwSetTxSimulator) GetContractStatesById(contractid []byte) (map[string]
 	return s.dag.GetContractStatesById(contractid)
 }
 
-func (h *RwSetTxSimulator) CheckDone() error {
-	if h.doneInvoked {
+func (s *RwSetTxSimulator) CheckDone() error {
+	if s.doneInvoked {
 		return errors.New("This instance should not be used after calling Done()")
 	}
 	return nil
@@ -184,6 +206,7 @@ func (h *RwSetTxSimulator) Done() {
 		return
 	}
 	//todo
+	h.doneInvoked = true
 }
 
 func (h *RwSetTxSimulator) GetTxSimulationResults() ([]byte, error) {

@@ -18,7 +18,6 @@ package modules
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -43,10 +42,8 @@ const (
 
 	//APP_CONFIG
 	APP_DATA
-	// todo 以下两个类型待合并
-	OP_MEDIATOR_COUNT_SET
-	APP_VOTE
 	OP_MEDIATOR_CREATE
+	OP_ACCOUNT_UPDATE
 
 	APP_UNKNOW = 99
 
@@ -55,8 +52,8 @@ const (
 	APP_CONTRACT_INVOKE_REQUEST = 102
 	APP_CONTRACT_STOP_REQUEST   = 103
 	// 为了兼容起见:
-	// 添加別的request需要添加在 APP_CONTRACT_TPL_REQUEST 和 APP_CONTRACT_STOP_REQUEST 之间
-	// 添加别的msg类型，需要添加到OP_MEDIATOR_CREATE 和 APP_UNKNOW之间
+	// 添加別的request需要添加在 APP_CONTRACT_TPL_REQUEST 与 APP_CONTRACT_STOP_REQUEST 之间
+	// 添加别的msg类型，需要添加到OP_MEDIATOR_CREATE 与 APP_UNKNOW之间
 )
 
 // key: message.UnitHash(message+timestamp)
@@ -77,9 +74,8 @@ func (msg *Message) CopyMessages(cpyMsg *Message) *Message {
 	msg.App = cpyMsg.App
 	//msg.Payload = cpyMsg.Payload
 	switch cpyMsg.App {
-	// modified by albert·gou
 	default:
-		//case APP_PAYMENT, APP_CONTRACT_TPL, APP_DATA, APP_VOTE:
+		//case APP_PAYMENT, APP_CONTRACT_TPL, APP_DATA:
 		msg.Payload = cpyMsg.Payload
 		//case APP_CONFIG:
 		//	payload, _ := cpyMsg.Payload.(*ConfigPayload)
@@ -180,7 +176,8 @@ func (msg *Message) CompareMessages(inMsg *Message) bool {
 	case APP_CONTRACT_DEPLOY_REQUEST:
 		payA, _ := msg.Payload.(*ContractDeployRequestPayload)
 		payB, _ := inMsg.Payload.(*ContractDeployRequestPayload)
-		return reflect.DeepEqual(payA, payB)
+		return payA.Equal(payB)
+		//return reflect.DeepEqual(payA, payB)
 	case APP_CONTRACT_INVOKE_REQUEST:
 		payA, _ := msg.Payload.(*ContractInvokeRequestPayload)
 		payB, _ := inMsg.Payload.(*ContractInvokeRequestPayload)
@@ -189,11 +186,8 @@ func (msg *Message) CompareMessages(inMsg *Message) bool {
 		payA, _ := msg.Payload.(*ContractStopRequestPayload)
 		payB, _ := inMsg.Payload.(*ContractStopRequestPayload)
 		return payA.Equal(payB)
-	default:
-		return false
 	}
-
-	return false
+	return true
 }
 
 type ContractWriteSet struct {
@@ -292,7 +286,7 @@ func (version *StateVersion) Bytes() []byte {
 	return b[:]
 }
 func (version *StateVersion) SetBytes(b []byte) {
-	asset := IDType16{}
+	asset := AssetId{}
 	asset.SetBytes(b[:15])
 	heightIdx := littleEndian.Uint64(b[16:24])
 	isMain := b[24]
@@ -341,10 +335,10 @@ type ContractReadSet struct {
 type InvokeInfo struct {
 	InvokeAddress string          `json:"invoke_address"` //请求地址
 	InvokeTokens  []*InvokeTokens `json:"invoke_tokens"`  //请求数量
-	InvokeFees    *AmountAsset    `json:"invoke_fees"`    //请求交易费
+	InvokeFees    *AmountAsset    `json:"invoke_fees"`    //请求交易�?
 }
 
-//请求的数量
+//请求的数�?
 type InvokeTokens struct {
 	Amount  uint64 `json:"amount"`  //数量
 	Asset   *Asset `json:"asset"`   //资产
@@ -358,7 +352,7 @@ type MediatorRegisterInfo struct {
 	Time    int64  `json:"time"`
 }
 
-//金额和资产
+//金额和资�?
 type AmountAsset struct {
 	Amount uint64 `json:"amount"`
 	Asset  *Asset `json:"asset"`
@@ -410,7 +404,7 @@ type ContractDeployPayload struct {
 
 // Contract invoke message
 // App: contract_invoke
-//如果是用户想修改自己的State信息，那么ContractId可以为空或者0字节
+//如果是用户想修改自己的State信息，那么ContractId可以为空或�?0字节
 type ContractInvokePayload struct {
 	ContractId   []byte             `json:"contract_id"` // contract id
 	FunctionName string             `json:"function_name"`
@@ -438,11 +432,11 @@ type ContractInvokeResult struct {
 	WriteSet     []ContractWriteSet `json:"write_set"`    // the set data of write, and value could be any type
 	Payload      []byte             `json:"payload"`      // the contract execution result
 	TokenPayOut  []*TokenPayOut     `json:"token_payout"` //从合约地址付出Token
-	TokenSupply  []*TokenSupply     `json:"token_supply"` //增发Token请求产生的结果
+	TokenSupply  []*TokenSupply     `json:"token_supply"` //增发Token请求产生的结�?
 	TokenDefine  *TokenDefine       `json:"token_define"` //定义新Token
 }
 
-//用户钱包发起的合约调用申请
+//用户钱包发起的合约调用申�?
 type ContractInstallRequestPayload struct {
 	TplName string `json:"tpl_name"`
 	Path    string `json:"install_path"`
@@ -494,7 +488,7 @@ type FileInfo struct {
 	UintHeight  uint64      `json:"unit_index"`
 	ParentsHash common.Hash `json:"parents_hash"`
 	Txid        common.Hash `json:"txid"`
-	Timestamp   int64       `json:"timestamp"`
+	Timestamp   uint64      `json:"timestamp"`
 	MainData    string      `json:"main_data"`
 	ExtraData   string      `json:"extra_data"`
 }
@@ -533,7 +527,7 @@ func NewContractDeployPayload(templateid []byte, contractid []byte, name string,
 }
 
 //TokenPayOut   []*modules.TokenPayOut     `json:"token_payout"`   //从合约地址付出Token
-//	TokenSupply   []*modules.TokenSupply     `json:"token_supply"`   //增发Token请求产生的结果
+//	TokenSupply   []*modules.TokenSupply     `json:"token_supply"`   //增发Token请求产生的结�?
 //	TokenDefine   *modules.TokenDefine       `json:"token_define"`   //定义新Token
 func NewContractInvokePayload(contractid []byte, funcName string, args [][]byte, excutiontime time.Duration,
 	readset []ContractReadSet, writeset []ContractWriteSet, payload []byte) *ContractInvokePayload {
@@ -754,4 +748,34 @@ func (a *ContractStopRequestPayload) Equal(b *ContractStopRequestPayload) bool {
 		return false
 	}
 	return true
+}
+
+//foundation modify sys param
+type FoundModify struct {
+	Key   string
+	Value string
+}
+
+type SysTokenIDInfo struct {
+	CreateAddr     string
+	TotalSupply    uint64
+	LeastNum       uint64
+	AssetID        string
+	CreateTime     time.Time
+	IsVoteEnd      bool
+	SupportResults []*SysSupportResult
+}
+type SysSupportResult struct {
+	TopicIndex  uint64
+	TopicTitle  string
+	VoteResults []*SysVoteResult
+}
+type SysVoteResult struct {
+	SelectOption string
+	Num          uint64
+}
+
+type CertInfo struct {
+	NeedCert bool
+	Certid   []byte // should be big.Int byte
 }

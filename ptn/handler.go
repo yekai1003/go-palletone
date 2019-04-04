@@ -23,6 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"strings"
+	"sync/atomic"
+
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/event"
 	"github.com/palletone/go-palletone/common/log"
@@ -30,13 +33,14 @@ import (
 	"github.com/palletone/go-palletone/common/p2p/discover"
 	"github.com/palletone/go-palletone/consensus/jury"
 	mp "github.com/palletone/go-palletone/consensus/mediatorplugin"
+	"github.com/palletone/go-palletone/core"
 	"github.com/palletone/go-palletone/dag"
 	dagerrors "github.com/palletone/go-palletone/dag/errors"
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/ptn/downloader"
 	"github.com/palletone/go-palletone/ptn/fetcher"
 	"github.com/palletone/go-palletone/ptn/lps"
-	"sync/atomic"
+	"github.com/palletone/go-palletone/consensus"
 )
 
 const (
@@ -63,8 +67,10 @@ func errResp(code errCode, format string, v ...interface{}) error {
 }
 
 type ProtocolManager struct {
-	networkId uint64
-	srvr      *p2p.Server
+	networkId    uint64
+	srvr         *p2p.Server
+	protocolName string
+	mainAssetId  modules.AssetId
 
 	fastSync  uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
 	acceptTxs uint32 // Flag whether we're considered synchronised (enables transaction processing)
@@ -96,6 +102,11 @@ type ProtocolManager struct {
 	quitSync    chan struct{}
 	noMorePeers chan struct{}
 
+	//consensus test for p2p
+	consEngine core.ConsensusEngine
+	ceCh       chan core.ConsensusEvent
+	ceSub      event.Subscription
+
 	// append by Albert·Gou
 	producer           producer
 	newProducedUnitCh  chan mp.NewProducedUnitEvent
@@ -118,7 +129,7 @@ type ProtocolManager struct {
 	vssResponseSub event.Subscription
 
 	//contract exec
-	contractProc contractInf
+	contractProc consensus.ContractInf
 	contractCh   chan jury.ContractEvent
 	contractSub  event.Subscription
 
@@ -136,13 +147,15 @@ type ProtocolManager struct {
 // with the PalletOne network.
 func NewProtocolManager(mode downloader.SyncMode, networkId uint64, protocolName string, txpool txPool,
 	dag dag.IDag, mux *event.TypeMux, producer producer, genesis *modules.Unit,
-	contractProc contractInf) (*ProtocolManager, error) {
+	contractProc consensus.ContractInf, engine core.ConsensusEngine) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkId:    networkId,
 		dag:          dag,
+		protocolName: protocolName,
 		txpool:       txpool,
 		eventMux:     mux,
+		consEngine:   engine,
 		peers:        newPeerSet(),
 		lightPeers:   newPeerSet(),
 		newPeerCh:    make(chan *peer),
@@ -154,6 +167,13 @@ func NewProtocolManager(mode downloader.SyncMode, networkId uint64, protocolName
 		contractProc: contractProc,
 		lightSync:    uint32(1),
 	}
+
+	asset, err := modules.NewAsset(strings.ToUpper(protocolName), modules.AssetType_FungibleToken, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, modules.UniqueIdType_Null, modules.UniqueId{})
+	if err != nil {
+		log.Error("ProtocolManager new asset err", err)
+		return nil, err
+	}
+	manager.mainAssetId = asset.AssetId
 
 	// Figure out whether to allow fast sync or not
 	/*blockchain.CurrentBlock().NumberU64() > 0 */
@@ -196,7 +216,16 @@ func NewProtocolManager(mode downloader.SyncMode, networkId uint64, protocolName
 			},
 			PeerInfo: func(id discover.NodeID) interface{} {
 				if p := manager.peers.Peer(id.TerminalString()); p != nil {
-					return p.Info()
+					return p.Info(p.Caps()[0].Name)
+				}
+				return nil
+			},
+			Corss: func() []string {
+				return manager.Corss()
+			},
+			CorsPeerInfo: func(protocl string, id discover.NodeID) interface{} {
+				if p := manager.lightPeers.Peer(id.TerminalString()); p != nil {
+					return p.Info(protocl)
 				}
 				return nil
 			},
@@ -223,7 +252,7 @@ func (pm *ProtocolManager) newFetcher() *fetcher.Fetcher {
 		}
 		return nil
 	}
-	heighter := func(assetId modules.IDType16) uint64 {
+	heighter := func(assetId modules.AssetId) uint64 {
 		unit := pm.dag.GetCurrentUnit(assetId)
 		if unit != nil {
 			return unit.NumberU64()
@@ -327,6 +356,12 @@ func (pm *ProtocolManager) Start(srvr *p2p.Server, maxPeers int) {
 	pm.activeMediatorsUpdatedCh = make(chan dag.ActiveMediatorsUpdatedEvent)
 	pm.activeMediatorsUpdatedSub = pm.dag.SubscribeActiveMediatorsUpdatedEvent(pm.activeMediatorsUpdatedCh)
 	go pm.activeMediatorsUpdatedEventRecvLoop()
+
+	if pm.consEngine != nil {
+		pm.ceCh = make(chan core.ConsensusEvent, txChanSize)
+		pm.ceSub = pm.consEngine.SubscribeCeEvent(pm.ceCh)
+		go pm.ceBroadcastLoop()
+	}
 }
 
 func (pm *ProtocolManager) Stop() {
@@ -377,7 +412,11 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	if len(p.Caps()) > 0 && (pm.SubProtocols[0].Name != p.Caps()[0].Name) {
 		return pm.PartitionHandle(p)
 	}
+	return pm.LocalHandle(p)
 
+}
+
+func (pm *ProtocolManager) LocalHandle(p *peer) error {
 	// Ignore maxPeers if this is a trusted peer
 	if pm.peers.Len() >= pm.maxPeers && !p.Peer.Info().Network.Trusted {
 		log.Info("ProtocolManager", "handler DiscTooManyPeers:", p2p.DiscTooManyPeers)
@@ -385,10 +424,18 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	}
 	log.Debug("PalletOne peer connected", "name", p.Name())
 	// @分区后需要用token获取
-	token := modules.PTNCOIN
-	head := pm.dag.CurrentHeader(token)
+	//head := pm.dag.CurrentHeader(pm.mainAssetId)
+	var (
+		number = &modules.ChainIndex{}
+		hash   = common.Hash{}
+	)
+	if head := pm.dag.CurrentHeader(pm.mainAssetId); head != nil {
+		number = head.Number
+		hash = head.Hash()
+	}
+
 	// Execute the PalletOne handshake
-	if err := p.Handshake(pm.networkId, head.Number, pm.genesis.Hash() /*mediator,*/, head.Hash()); err != nil {
+	if err := p.Handshake(pm.networkId, number, pm.genesis.Hash(), hash); err != nil {
 		log.Debug("PalletOne handshake failed", "err", err)
 		return err
 	}
@@ -523,6 +570,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == ElectionMsg:
 		return pm.ElectionMsg(msg, p)
 
+	case msg.Code == AdapterMsg:
+		return pm.AdapterMsg(msg, p)
+
 	case msg.Code == GetLeafNodesMsg:
 		return pm.GetLeafNodesMsg(msg, p)
 
@@ -598,6 +648,14 @@ func (pm *ProtocolManager) ElectionBroadcast(event jury.ElectionEvent) {
 	}
 }
 
+func (pm *ProtocolManager) AdapterBroadcast(event jury.AdapterEvent) {
+	peers := pm.peers.GetPeers()
+	for _, peer := range peers {
+		peer.SendAdapterEvent(event)
+	}
+}
+
+
 func (pm *ProtocolManager) ContractBroadcast(event jury.ContractEvent, local bool) {
 	//peers := pm.peers.PeersWithoutUnit(event.Tx.TxHash)
 	peers := pm.peers.GetPeers()
@@ -625,17 +683,40 @@ type NodeInfo struct {
 
 // NodeInfo retrieves some protocol metadata about the running host node.
 func (self *ProtocolManager) NodeInfo(genesisHash common.Hash) *NodeInfo {
-	// TODO 按分区返回 unit
-	token := modules.PTNCOIN
-	unit := self.dag.CurrentUnit(token)
-	index := uint64(0)
+	unit := self.dag.CurrentUnit(self.mainAssetId)
+	var (
+		index = uint64(0)
+		hash  = common.Hash{}
+	)
 	if unit != nil {
 		index = unit.Number().Index
+		hash = unit.UnitHash
 	}
+
 	return &NodeInfo{
 		Network: self.networkId,
 		Index:   index,
 		Genesis: genesisHash,
-		Head:    unit.UnitHash,
+		Head:    hash,
+	}
+}
+
+//test for p2p broadcast
+func (pm *ProtocolManager) BroadcastCe(ce []byte) {
+	peers := pm.peers.GetPeers()
+	for _, peer := range peers {
+		peer.SendConsensus(ce)
+	}
+}
+func (self *ProtocolManager) ceBroadcastLoop() {
+	for {
+		select {
+		case event := <-self.ceCh:
+			self.BroadcastCe(event.Ce)
+
+			// Err() channel will be closed when unsubscribing.
+		case <-self.ceSub.Err():
+			return
+		}
 	}
 }

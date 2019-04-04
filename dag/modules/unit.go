@@ -18,7 +18,6 @@
 package modules
 
 import (
-	"crypto/ecdsa"
 	"strings"
 	"time"
 	"unsafe"
@@ -59,14 +58,15 @@ const (
 )
 
 type Header struct {
-	ParentsHash  []common.Hash `json:"parents_hash"`
-	Authors      Authentifier  `json:"mediator"`    // the unit creation authors
-	GroupSign    []byte        `json:"groupSign"`   // 群签名, 用于加快单元确认速度
-	GroupPubKey  []byte        `json:"groupPubKey"` // 群公钥, 用于验证群签名
-	TxRoot       common.Hash   `json:"root"`
-	Number       *ChainIndex   `json:"index"`
-	Extra        []byte        `json:"extra"`
-	Creationdate int64         `json:"creation_time"` // unit create time
+	ParentsHash []common.Hash `json:"parents_hash"`
+	Authors     Authentifier  `json:"mediator"`    // the unit creation authors
+	GroupSign   []byte        `json:"groupSign"`   // 群签名, 用于加快单元确认速度
+	GroupPubKey []byte        `json:"groupPubKey"` // 群公钥, 用于验证群签名
+	TxRoot      common.Hash   `json:"root"`
+	Number      *ChainIndex   `json:"index"`
+	Extra       []byte        `json:"extra"`
+	Time        int64         `json:"creation_time"` // unit create time
+	CryptoLib   []byte        `json:"crypto_lib"`    //该区块使用的加解密算法和哈希算法，0位表示非对称加密算法，1位表示Hash算法
 }
 
 func (cpy *Header) CopyHeader(h *Header) {
@@ -160,7 +160,7 @@ func CopyHeader(h *Header) *Header {
 		cpy.Number = CopyChainIndex(h.Number)
 	}
 	cpy.Extra = h.Extra[:]
-	cpy.Creationdate = h.Creationdate
+	cpy.Time = h.Time
 	cpy.Authors = h.Authors
 
 	if len(h.ParentsHash) > 0 {
@@ -231,12 +231,18 @@ type Unit struct {
 	ReceivedFrom interface{}
 }
 
+func (h *Header) Author() common.Address {
+	if h == nil {
+		log.Error("the Unit Header pointer is nil!")
+	}
+	return crypto.PubkeyBytesToAddress(h.Authors.PubKey)
+}
+
 func (unit *Unit) Author() common.Address {
 	if unit == nil {
 		log.Error("the Unit pointer is nil!")
 	}
-
-	return unit.UnitHeader.Authors.Address
+	return unit.UnitHeader.Author()
 }
 
 func (unit *Unit) GroupPubKey() (kyber.Point, error) {
@@ -274,13 +280,13 @@ type TxPoolTxs []*TxPoolTransaction
 //}
 //出于DAG和基于Token的分区共识的考虑，设计了该ChainIndex，
 type ChainIndex struct {
-	AssetID IDType16 `json:"asset_id"`
-	IsMain  bool     `json:"is_main"`
-	Index   uint64   `json:"index"`
+	AssetID AssetId `json:"asset_id"`
+	IsMain  bool    `json:"is_main"`
+	Index   uint64  `json:"index"`
 }
 
 func (height *ChainIndex) String() string {
-	return fmt.Sprintf("%s-%d", height.AssetID.ToAssetId(), height.Index)
+	return fmt.Sprintf("%s-%d", height.AssetID.String(), height.Index)
 }
 func (height *ChainIndex) Bytes() []byte {
 	data, err := rlp.EncodeToBytes(height)
@@ -297,17 +303,16 @@ func (height *ChainIndex) Bytes() []byte {
 //}
 
 type Authentifier struct {
-	Address common.Address `json:"address"`
-	R       []byte         `json:"r"`
-	S       []byte         `json:"s"`
-	V       []byte         `json:"v"`
+	PubKey    []byte `json:"pubkey"`
+	Signature []byte `json:"signature"`
 }
 
 func (au *Authentifier) Empty() bool {
-	if common.IsValidAddress(au.Address.String()) || len(au.R) == 0 || len(au.S) == 0 || len(au.V) == 0 {
-		return true
-	}
-	return false
+	return len(au.PubKey) == 0 || len(au.Signature) == 0
+}
+func (au *Authentifier) Address() common.Address {
+
+	return crypto.PubkeyBytesToAddress(au.PubKey)
 }
 
 func NewUnit(header *Header, txs Transactions) *Unit {
@@ -389,7 +394,7 @@ func (u *Unit) NumberU64() uint64 {
 }
 
 func (u *Unit) Timestamp() int64 {
-	return u.UnitHeader.Creationdate
+	return u.UnitHeader.Time
 }
 
 // return unit's parents UnitHash
@@ -481,6 +486,8 @@ func MsgstoAddress(msgs []*Message) common.Address {
 	}
 	return common.Address{}
 }
+
+/*
 func RSVtoPublicKey(hash, r, s, v []byte) (*ecdsa.PublicKey, error) {
 	sig := make([]byte, 65)
 	copy(sig[32-len(r):32], r)
@@ -488,7 +495,7 @@ func RSVtoPublicKey(hash, r, s, v []byte) (*ecdsa.PublicKey, error) {
 	copy(sig[64:], v)
 	return crypto.SigToPub(hash, sig)
 }
-
+*/
 /**
 根据大端规则填充字节
 To full fill bytes according bigendian

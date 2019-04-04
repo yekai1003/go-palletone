@@ -1,3 +1,4 @@
+// Copyright 2018 PalletOne
 // Copyright 2017 The go-ethereum Authors
 // This file is part of go-ethereum.
 //
@@ -75,7 +76,7 @@ var (
 	ConfigFilePathFlag = cli.StringFlag{
 		Name:  "configfile",
 		Usage: "TOML configuration file",
-		Value: defaultConfigPath,
+		Value: "", //defaultConfigPath,
 	}
 )
 
@@ -176,7 +177,7 @@ func getConfigPath(ctx *cli.Context) string {
 	configPath := defaultConfigPath
 	if temp := ctx.GlobalString(ConfigFilePathFlag.Name); temp != "" {
 		if files.IsDir(temp) {
-			temp = filepath.Join(temp, defaultConfigPath)
+			temp = filepath.Join(temp, filepath.Base(defaultConfigPath))
 		}
 		configPath = temp
 	}
@@ -230,8 +231,9 @@ func makeConfigNode(ctx *cli.Context, isInConsole bool) (*node.Node, FullConfig)
 
 	// log的配置比较特殊，不属于任何模块，顶级配置，程序开始运行就使用
 	utils.SetLogConfig(ctx, &cfg.Log, configDir, isInConsole)
-
+	utils.SetP2PConfig(ctx, &cfg.P2P)
 	adaptorNodeConfig(&cfg)
+
 	dataDir := utils.SetNodeConfig(ctx, &cfg.Node, configDir)
 	//通过Node的配置来创建一个Node, 变量名叫stack，代表协议栈的含义。
 	stack, err := node.New(&cfg.Node)
@@ -239,7 +241,6 @@ func makeConfigNode(ctx *cli.Context, isInConsole bool) (*node.Node, FullConfig)
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
 
-	utils.SetP2PConfig(ctx, &cfg.P2P)
 	utils.SetContractConfig(ctx, &cfg.Contract, dataDir)
 	utils.SetTxPoolConfig(ctx, &cfg.TxPool)
 	utils.SetDagConfig(ctx, &cfg.Dag, dataDir)
@@ -309,7 +310,7 @@ func getDumpConfigPath(ctx *cli.Context) string {
 	}
 
 	if files.IsDir(configPath) {
-		configPath = filepath.Join(configPath, defaultConfigPath)
+		configPath = filepath.Join(configPath, filepath.Base(defaultConfigPath))
 	}
 
 	return common.GetAbsPath(configPath)

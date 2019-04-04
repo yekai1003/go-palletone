@@ -60,6 +60,7 @@ const (
 	TxValidationCode_INVALID_ASSET                ValidationCode = 32
 	TxValidationCode_INVALID_CONTRACT             ValidationCode = 33
 	TxValidationCode_INVALID_DATAPAYLOAD          ValidationCode = 34
+	TxValidationCode_INVALID_DOUBLE_SPEND         ValidationCode = 35
 	TxValidationCode_NOT_VALIDATED                ValidationCode = 254
 	TxValidationCode_NOT_COMPARE_SIZE             ValidationCode = 255
 	TxValidationCode_INVALID_OTHER_REASON         ValidationCode = 256
@@ -72,8 +73,9 @@ const (
 	UNIT_STATE_INVALID_SIZE             ValidationCode = 106
 	UNIT_STATE_INVALID_EXTRA_DATA       ValidationCode = 107
 	UNIT_STATE_INVALID_HEADER           ValidationCode = 108
-	UNIT_STATE_CHECK_HEADER_PASSED      ValidationCode = 109
+	UNIT_STATE_INVALID_HEADER_NUMBER    ValidationCode = 109
 	UNIT_STATE_INVALID_HEADER_TXROOT    ValidationCode = 110
+	UNIT_STATE_INVALID_HEADER_TIME      ValidationCode = 111
 	UNIT_STATE_OTHER_ERROR              ValidationCode = 125
 )
 

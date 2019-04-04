@@ -38,9 +38,9 @@ func (p *Processor) ProcessContractEvent(event *ContractEvent) error {
 	//if !p.checkTxIsExist(event.Tx) {
 	//	return errors.New("ProcessContractEvent event Tx is exist")
 	//}
-	//if !p.checkTxValid(event.Tx) {
-	//	return errors.New("ProcessContractEvent event Tx is invalid")
-	//}
+	if !p.checkTxValid(event.Tx) {
+		return errors.New("ProcessContractEvent event Tx is invalid")
+	}
 	if !p.contractEventExecutable(event.CType, event.Tx, event.Ele) {
 		log.Debug("ProcessContractEvent", "contractEventExecutable is false, reqId", event.Tx.RequestHash())
 		return nil
@@ -72,6 +72,7 @@ func (p *Processor) contractExecEvent(tx *modules.Transaction, ele []ElectionInf
 		eleInf: ele,
 		tm:     time.Now(),
 		valid:  true,
+		adaInf: make(map[uint32][]AdapterInf),
 	}
 	p.locker.Unlock()
 	log.Debug("contractExecEvent", "add tx req id", reqId)
@@ -99,6 +100,7 @@ func (p *Processor) contractSigEvent(tx *modules.Transaction, ele []ElectionInf)
 			eleInf: ele,
 			tm:     time.Now(),
 			valid:  true,
+			adaInf: make(map[uint32][]AdapterInf),
 		}
 		p.mtx[reqId].rcvTx = append(p.mtx[reqId].rcvTx, tx)
 		p.locker.Unlock()
@@ -109,7 +111,8 @@ func (p *Processor) contractSigEvent(tx *modules.Transaction, ele []ElectionInf)
 	ctx := p.mtx[reqId]
 	ctx.rcvTx = append(ctx.rcvTx, tx)
 	//如果是jury，将接收到tx与本地执行后的tx进行对比，相同则添加签名到sigTx，如果满足三个签名且签名值最小则广播tx，否则函数返回
-	if ok, err := checkAndAddTxData(ctx.sigTx, tx); err == nil && ok {
+
+	if ok, err := checkAndAddTxSigMsgData(ctx.sigTx, tx); err == nil && ok {
 		if getTxSigNum(ctx.sigTx) >= p.contractSigNum {
 			if localIsMinSignature(ctx.sigTx) {
 				go p.ptn.ContractBroadcast(ContractEvent{Ele: ele, CType: CONTRACT_EVENT_COMMIT, Tx: ctx.sigTx}, true)
@@ -127,12 +130,14 @@ func (p *Processor) contractCommitEvent(tx *modules.Transaction) error {
 	//合约安装，检查合约签名数据
 	//用户合约，检查签名数量及有效性
 	p.locker.Lock()
+	defer p.locker.Unlock()
 	if _, ok := p.mtx[reqId]; !ok {
 		log.Debug("contractCommitEvent", "local not find reqId,create it", reqId.String())
 		p.mtx[reqId] = &contractTx{
-			reqTx: tx,
-			tm:    time.Now(),
-			valid: true,
+			reqTx:  tx,
+			tm:     time.Now(),
+			valid:  true,
+			adaInf: make(map[uint32][]AdapterInf),
 		}
 	} else if p.mtx[reqId].rstTx != nil {
 		log.Info("contractCommitEvent", "rstTx already receive,reqId", reqId)
@@ -140,7 +145,6 @@ func (p *Processor) contractCommitEvent(tx *modules.Transaction) error {
 	}
 	p.mtx[reqId].valid = true
 	p.mtx[reqId].rstTx = tx
-	p.locker.Unlock()
 
 	return nil
 }

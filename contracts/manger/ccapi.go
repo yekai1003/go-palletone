@@ -14,6 +14,7 @@ import (
 	"github.com/palletone/go-palletone/common/log"
 	db "github.com/palletone/go-palletone/contracts/comm"
 	cfg "github.com/palletone/go-palletone/contracts/contractcfg"
+	"github.com/palletone/go-palletone/contracts/core"
 	cclist "github.com/palletone/go-palletone/contracts/list"
 	"github.com/palletone/go-palletone/contracts/scc"
 	"github.com/palletone/go-palletone/contracts/ucc"
@@ -67,11 +68,11 @@ func listGet(templateId []byte) (*TempCC, error) {
 }
 
 // contract manger module init
-func Init(dag dag.IDag) error {
+func Init(dag dag.IDag, jury core.IAdapterJury) error {
 	if err := db.SetCcDagHand(dag); err != nil {
 		return err
 	}
-	if err := peerServerInit(); err != nil {
+	if err := peerServerInit(jury); err != nil {
 		log.Errorf("peerServerInit:%s", err)
 		return err
 	}
@@ -84,8 +85,8 @@ func Init(dag dag.IDag) error {
 	return nil
 }
 
-func InitNoSysCCC() error {
-	if err := peerServerInit(); err != nil {
+func InitNoSysCCC(jury core.IAdapterJury) error {
+	if err := peerServerInit(jury); err != nil {
 		log.Errorf("peerServerInit error:%s", err)
 		return err
 	}
@@ -178,9 +179,9 @@ func Install(dag dag.IDag, chainID string, ccName string, ccPath string, ccVersi
 }
 
 func Deploy(idag dag.IDag, chainID string, templateId []byte, txId string, args [][]byte, timeout time.Duration) (deployId []byte, deployPayload *md.ContractDeployPayload, e error) {
-	log.Infof("enter ccapi.go Deploy")
-	defer log.Infof("exit ccapi.go Deploy")
-	log.Infof("chainid[%s]-templateId[%s]-txid[%s]", chainID, hex.EncodeToString(templateId), txId)
+	log.Info("enter Deploy", "chainID", chainID, "templateId", hex.EncodeToString(templateId), "txId", txId)
+	defer log.Info("exit Deploy", "txId", txId)
+
 	var mksupt Support = &SupportImpl{}
 	setChainId := "palletone"
 	setTimeOut := time.Duration(30) * time.Second
@@ -225,7 +226,7 @@ func Deploy(idag dag.IDag, chainID string, templateId []byte, txId string, args 
 		log.Error("getTxSimulator err:", "error", err)
 		return nil, nil, errors.WithMessage(err, "GetTxSimulator error")
 	}
-	usrccName := templateCC.Name + "-" + txId
+	usrccName := templateCC.Name //+ "_" + txId
 	usrcc := &ucc.UserChaincode{
 		Name:     usrccName,
 		Path:     templateCC.Path,
@@ -256,7 +257,7 @@ func Deploy(idag dag.IDag, chainID string, templateId []byte, txId string, args 
 	}
 	err = cclist.SetChaincode(setChainId, 0, cc)
 	if err != nil {
-		log.Errorf("setchaincode[%s]-[%s] fail", setChainId, cc.Name)
+		log.Error("Deploy", "SetChaincode fail, chainId", setChainId, "name", cc.Name)
 	}
 
 	unit, err := RwTxResult2DagDeployUnit(txsim, templateId, cc.Name, cc.Id, args, timeout)
@@ -287,14 +288,13 @@ func Invoke(idag dag.IDag, chainID string, deployId []byte, txid string, args []
 	}
 
 	log.Infof("Invoke [%s][%s]", chainID, cc.Name)
-	start := time.Now()
+	startTm := time.Now()
 	es := NewEndorserServer(mksupt)
 	spec := &pb.ChaincodeSpec{
 		ChaincodeId: &pb.ChaincodeID{Name: cc.Name},
 		Type:        pb.ChaincodeSpec_GOLANG,
 		Input:       &pb.ChaincodeInput{Args: args},
 	}
-
 	cid := &pb.ChaincodeID{
 		Path:    "", //no use
 		Name:    cc.Name,
@@ -306,15 +306,13 @@ func Invoke(idag dag.IDag, chainID string, deployId []byte, txid string, args []
 		log.Errorf("signedEndorserProposa error[%v]", err)
 		return nil, err
 	}
-
 	rsp, unit, err := es.ProcessProposal(idag, deployId, context.Background(), sprop, prop, chainID, cid, timeout)
-
 	if err != nil {
 		log.Errorf("ProcessProposal error[%v]", err)
 		return nil, err
 	}
-	t0 := time.Now()
-	duration := t0.Sub(start)
+	stopTm := time.Now()
+	duration := stopTm.Sub(startTm)
 	//unit.ExecutionTime = duration
 	requstId := common.HexToHash(txid)
 	unit.RequestId = requstId
@@ -339,7 +337,7 @@ func Invoke(idag dag.IDag, chainID string, deployId []byte, txid string, args []
 	return unit, nil
 }
 
-func Stop(contractid []byte, chainID string, deployId []byte, txid string, deleteImage bool) (*md.ContractStopPayload,error) {
+func Stop(contractid []byte, chainID string, deployId []byte, txid string, deleteImage bool) (*md.ContractStopPayload, error) {
 	log.Infof("enter ccapi.go Stop")
 	defer log.Infof("exit ccapi.go Stop")
 	log.Infof("deployId[%s]txid[%s]", hex.EncodeToString(deployId), txid)
@@ -348,17 +346,17 @@ func Stop(contractid []byte, chainID string, deployId []byte, txid string, delet
 		setChainId = chainID
 	}
 	if txid == "" {
-		return nil,errors.New("input param txid is nil")
+		return nil, errors.New("input param txid is nil")
 	}
 	cc, err := cclist.GetChaincode(chainID, deployId)
 	if err != nil {
 		return nil, err
 	}
-	stopResult,err := StopByName(contractid, setChainId, txid, cc.Name, cc.Path, cc.Version, deleteImage)
+	stopResult, err := StopByName(contractid, setChainId, txid, cc.Name, cc.Path, cc.Version, deleteImage)
 	if err == nil {
 		cclist.DelChaincode(chainID, cc.Name, cc.Version)
 	}
-	return stopResult,err
+	return stopResult, err
 }
 
 func DeployByName(idag dag.IDag, chainID string, txid string, ccName string, ccPath string, ccVersion string, args [][]byte, timeout time.Duration) (depllyId []byte, respPayload *md.ContractDeployPayload, e error) {
@@ -419,7 +417,7 @@ func DeployByName(idag dag.IDag, chainID string, txid string, ccName string, ccP
 	return cc.Id, nil, err
 }
 
-func StopByName(contractid []byte, chainID string, txid string, ccName string, ccPath string, ccVersion string, deleteImage bool) (*md.ContractStopPayload,error) {
+func StopByName(contractid []byte, chainID string, txid string, ccName string, ccPath string, ccVersion string, deleteImage bool) (*md.ContractStopPayload, error) {
 	usrcc := &ucc.UserChaincode{
 		Name:    ccName,
 		Path:    ccPath,
@@ -429,10 +427,10 @@ func StopByName(contractid []byte, chainID string, txid string, ccName string, c
 	err := ucc.StopUserCC(contractid, chainID, usrcc, txid, deleteImage)
 	if err != nil {
 		errMsg := fmt.Sprintf("StopUserCC err[%s]-[%s]-err[%s]", chainID, ccName, err)
-		return nil,errors.New(errMsg)
+		return nil, errors.New(errMsg)
 	}
 	stopResult := &md.ContractStopPayload{
-		ContractId:contractid,
+		ContractId: contractid,
 	}
-	return stopResult,nil
+	return stopResult, nil
 }

@@ -39,7 +39,7 @@ var (
 var DefaultConfig = Config{
 	DbPath: "./leveldb",
 	// txpool
-	UnitTxSize: 1024 * 1024,
+	UnitTxSize: 1024 * 1000 * 5, //5mb
 
 	// utxo
 	UtxoIndex: true,
@@ -54,6 +54,7 @@ var DefaultConfig = Config{
 	PtnAssetId:                   modules.NewPTNAsset().AssetId[:],
 	IsRewardCoin:                 false,
 	AddrTxsIndex:                 false,
+	Token721TxIndex:              true,
 	TextFileHashIndex:            false,
 	GasToken:                     DefaultToken,
 	MainToken:                    DefaultToken,
@@ -63,7 +64,7 @@ func init() {
 	if DagConfig.PtnAssetHex != "" {
 		id, _ := modules.SetIdTypeByHex(DagConfig.PtnAssetHex)
 		DagConfig.PtnAssetId = id[:]
-		modules.PTNCOIN.SetBytes(DagConfig.PtnAssetId)
+		// modules.PTNCOIN.SetBytes(DagConfig.PtnAssetId)
 	}
 }
 
@@ -101,18 +102,19 @@ type Config struct {
 	PtnAssetHex string
 	PtnAssetId  []byte
 
-	IsRewardCoin bool
-	AddrTxsIndex bool
+	IsRewardCoin    bool
+	AddrTxsIndex    bool
+	Token721TxIndex bool
 
 	TextFileHashIndex bool
 
 	//当前节点选择的平台币，燃料币,必须为Asset全名
 	GasToken            string
-	gasToken            modules.IDType16 `toml:"-"`
+	gasToken            modules.AssetId `toml:"-"`
 	MainToken           string
-	mainToken           modules.IDType16
+	mainToken           modules.AssetId
 	SyncPartitionTokens []string
-	syncPartitionTokens []modules.IDType16 `toml:"-"`
+	syncPartitionTokens []modules.AssetId `toml:"-"`
 }
 
 type Sconfig struct {
@@ -147,9 +149,9 @@ func homeDir() string {
 	return ""
 }
 
-func (c *Config) GetGasToken() modules.IDType16 {
+func (c *Config) GetGasToken() modules.AssetId {
 	if c.gasToken == modules.ZeroIdType16() {
-		token, err := modules.String2AssetId(c.GasToken)
+		token, _, err := modules.String2AssetId(c.GasToken)
 		if err != nil {
 			log.Warn("Cannot parse node.GasToken to a correct asset, token str:" + c.GasToken)
 			return modules.PTNCOIN
@@ -158,9 +160,9 @@ func (c *Config) GetGasToken() modules.IDType16 {
 	}
 	return c.gasToken
 }
-func (c *Config) GetMainToken() modules.IDType16 {
+func (c *Config) GetMainToken() modules.AssetId {
 	if c.mainToken == modules.ZeroIdType16() {
-		token, err := modules.String2AssetId(c.MainToken)
+		token, _, err := modules.String2AssetId(c.MainToken)
 		{
 			if err != nil {
 				return modules.PTNCOIN
@@ -170,11 +172,11 @@ func (c *Config) GetMainToken() modules.IDType16 {
 	}
 	return c.mainToken
 }
-func (c *Config) GeSyncPartitionTokens() []modules.IDType16 {
+func (c *Config) GeSyncPartitionTokens() []modules.AssetId {
 	if c.syncPartitionTokens == nil {
-		c.syncPartitionTokens = []modules.IDType16{}
+		c.syncPartitionTokens = []modules.AssetId{}
 		for _, tokenString := range c.SyncPartitionTokens {
-			token, err := modules.String2AssetId(tokenString)
+			token, _, err := modules.String2AssetId(tokenString)
 			if err != nil {
 				log.Warn("Cannot parse node.SyncPartitionTokens to a correct asset, token str:" + c.GasToken)
 				c.syncPartitionTokens = append(c.syncPartitionTokens, token)

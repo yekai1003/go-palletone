@@ -35,7 +35,6 @@ import (
 	"github.com/palletone/go-palletone/common/obj"
 	"github.com/palletone/go-palletone/common/util"
 	"github.com/palletone/go-palletone/core"
-	"github.com/palletone/go-palletone/dag/vote"
 )
 
 var (
@@ -89,16 +88,24 @@ func (pld *PaymentPayload) AddTxOut(to *Output) {
 	pld.Outputs = append(pld.Outputs, to)
 }
 
+type TransactionWithUnitInfo struct {
+	*Transaction
+	UnitHash  common.Hash
+	UnitIndex uint64
+	Timestamp uint64
+	TxIndex   uint64
+}
+
 type TxPoolTransaction struct {
 	Tx *Transaction
 
 	From         []*OutPoint
 	CreationDate time.Time `json:"creation_date"`
 	Priority_lvl string    `json:"priority_lvl"` // 打包的优先级
-	Nonce        uint64    // transaction'hash maybe repeat.
 	UnitHash     common.Hash
 	Pending      bool
 	Confirmed    bool
+	IsOrphan     bool
 	Discarded    bool         // will remove
 	TxFee        *AmountAsset `json:"tx_fee"`
 	Index        int          `json:"index"  rlp:"-"` // index 是该tx在优先级堆中的位置
@@ -109,49 +116,11 @@ type TxPoolTransaction struct {
 	DependOnTxs []common.Hash
 }
 
-//// EncodeRLP implements rlp.Encoder
-//func (tx *Transaction) EncodeRLP(w io.Writer) error {
-//	return rlp.Encode(w, &tx.data)
-//}
-//
-//// DecodeRLP implements rlp.Decoder
-//func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
-//	_, UnitSize, _ := s.Kind()
-//	err := s.Decode(&tx.data)
-//	if err == nil {
-//		tx.UnitSize.Store(common.StorageSize(rlp.ListSize(UnitSize)))
-//	}
-//
-//	return err
-//}
-//
-//// MarshalJSON encodes the web3 RPC transaction format.
-//func (tx *Transaction) MarshalJSON() ([]byte, error) {
-//	UnitHash := tx.Hash()
-//	data := tx.data
-//	data.Hash = &UnitHash
-//	return data.MarshalJSON()
-//}
-//
-//// UnmarshalJSON decodes the web3 RPC transaction format.
-//func (tx *Transaction) UnmarshalJSON(input []byte) error {
-//	var dec txdata
-//	if err := dec.UnmarshalJSON(input); err != nil {
-//		return err
-//	}
-//	var V byte
-//	if isProtectedV(dec.V) {
-//		chainID := deriveChainId(dec.V).Uint64()
-//		V = byte(dec.V.Uint64() - 35 - 2*chainID)
-//	} else {
-//		V = byte(dec.V.Uint64() - 27)
-//	}
-//	if !crypto.ValidateSignatureValues(V, dec.R, dec.S, false) {
-//		return errors.New("invalid transaction v, r, s values")
-//	}
-//	*tx = Transaction{data: dec}
-//	return nil
-//}
+func (tx *TxPoolTransaction) Less(otherTx interface{}) bool {
+	ap, _ := strconv.ParseFloat(tx.Priority_lvl, 64)
+	bp, _ := strconv.ParseFloat(otherTx.(*TxPoolTransaction).Priority_lvl, 64)
+	return ap < bp
+}
 
 func (tx *TxPoolTransaction) GetPriorityLvl() string {
 	// priority_lvl=  fee/size*(1+(time.Now-CreationDate)/24)
@@ -226,21 +195,31 @@ func (tx *Transaction) RequestHash() common.Hash {
 	return util.RlpHash(req)
 }
 
-func (tx *Transaction) Messages() []*Message {
-	msgs := make([]*Message, 0)
+func (tx *Transaction) ContractIdBytes() []byte {
 	for _, msg := range tx.TxMessages {
-		msgs = append(msgs, msg)
+		switch msg.App {
+		case APP_CONTRACT_DEPLOY_REQUEST:
+			tmp := common.BytesToAddress(tx.RequestHash().Bytes())
+			out := common.NewAddress(tmp.Bytes(), common.ContractHash)
+			return out[:]
+		case APP_CONTRACT_INVOKE_REQUEST:
+			payload := msg.Payload.(*ContractInvokeRequestPayload)
+			return payload.ContractId
+		case APP_CONTRACT_STOP_REQUEST:
+			payload := msg.Payload.(*ContractStopRequestPayload)
+			return payload.ContractId
+		}
 	}
-	return msgs
+	return nil
+}
+
+func (tx *Transaction) Messages() []*Message {
+	return tx.TxMessages[:]
 }
 
 // Size returns the true RLP encoded storage UnitSize of the transaction, either by
 // encoding and returning it, or returning a previsouly cached value.
 func (tx *Transaction) Size() common.StorageSize {
-	//c := WriteCounter(0)
-	//rlp.Encode(&c, &tx)
-	//return common.StorageSize(c)
-
 	return CalcDateSize(tx)
 }
 
@@ -250,28 +229,28 @@ func (tx *Transaction) CreateDate() string {
 }
 
 // address return the tx's original address  of from and to
-func (tx *Transaction) GetAddressInfo() ([]*OutPoint, [][]byte) {
-	froms := make([]*OutPoint, 0)
-	tos := make([][]byte, 0)
-	if len(tx.Messages()) > 0 {
-		msg := tx.Messages()[0]
-		if msg.App == APP_PAYMENT {
-			payment, ok := msg.Payload.(*PaymentPayload)
-			if ok {
-				for _, input := range payment.Inputs {
-					if input.PreviousOutPoint != nil {
-						froms = append(froms, input.PreviousOutPoint)
-					}
-				}
-
-				for _, out := range payment.Outputs {
-					tos = append(tos, out.PkScript[:])
-				}
-			}
-		}
-	}
-	return froms, tos
-}
+//func (tx *Transaction) GetAddressInfo() ([]*OutPoint, [][]byte) {
+//	froms := make([]*OutPoint, 0)
+//	tos := make([][]byte, 0)
+//	if len(tx.Messages()) > 0 {
+//		msg := tx.Messages()[0]
+//		if msg.App == APP_PAYMENT {
+//			payment, ok := msg.Payload.(*PaymentPayload)
+//			if ok {
+//				for _, input := range payment.Inputs {
+//					if input.PreviousOutPoint != nil {
+//						froms = append(froms, input.PreviousOutPoint)
+//					}
+//				}
+//
+//				for _, out := range payment.Outputs {
+//					tos = append(tos, out.PkScript[:])
+//				}
+//			}
+//		}
+//	}
+//	return froms, tos
+//}
 func (tx *Transaction) Asset() *Asset {
 	if tx == nil {
 		return nil
@@ -291,9 +270,7 @@ func (tx *Transaction) Asset() *Asset {
 	return asset
 }
 func (tx *Transaction) CopyFrTransaction(cpy *Transaction) {
-
 	obj.DeepCopy(&tx, cpy)
-
 }
 
 // Len returns the length of s.
@@ -336,13 +313,6 @@ func TxDifference(a, b Transactions) (keep Transactions) {
 	return keep
 }
 
-// single account, otherwise a nonce comparison doesn't make much sense.
-type TxByNonce TxPoolTxs
-
-func (s TxByNonce) Len() int           { return len(s) }
-func (s TxByNonce) Less(i, j int) bool { return s[i].Nonce < s[j].Nonce }
-func (s TxByNonce) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
 // TxByPrice implements both the sort and the heap interface, making it useful
 // for all at once sorting as well as individually adding and removing elements.
 type TxByPrice TxPoolTxs
@@ -384,10 +354,6 @@ func (tc TxByCreationDate) Len() int           { return len(tc) }
 func (tc TxByCreationDate) Less(i, j int) bool { return tc[i].Priority_lvl > tc[j].Priority_lvl }
 func (tc TxByCreationDate) Swap(i, j int)      { tc[i], tc[j] = tc[j], tc[i] }
 
-// Message is a fully derived transaction and implements Message
-//
-// NOTE: In a future PR this will be removed.
-
 type WriteCounter common.StorageSize
 
 func (c *WriteCounter) Write(b []byte) (int, error) {
@@ -409,6 +375,7 @@ type TxLookupEntry struct {
 	UnitHash  common.Hash `json:"unit_hash"`
 	UnitIndex uint64      `json:"unit_index"`
 	Index     uint64      `json:"index"`
+	Timestamp uint64      `json:"timestamp"`
 }
 type Transactions []*Transaction
 
@@ -422,6 +389,7 @@ func (txs Transactions) GetTxIds() []common.Hash {
 
 type Transaction struct {
 	TxMessages []*Message `json:"messages"`
+	CertId     []byte     // should be big.Int byte
 }
 type QueryUtxoFunc func(outpoint *OutPoint) (*Utxo, error)
 
@@ -429,7 +397,7 @@ type QueryUtxoFunc func(outpoint *OutPoint) (*Utxo, error)
 func (tx *Transaction) GetTxFee(queryUtxoFunc QueryUtxoFunc) (*AmountAsset, error) {
 	for _, msg := range tx.TxMessages {
 		payload, ok := msg.Payload.(*PaymentPayload)
-		if ok == false {
+		if !ok {
 			continue
 		}
 		if payload.IsCoinbase() {
@@ -539,16 +507,12 @@ func (tx *Transaction) GetRequestTx() *Transaction {
 				payload := new(DataPayload)
 				obj.DeepCopy(payload, msg.Payload)
 				request.AddMessage(NewMessage(msg.App, payload))
-			} else if msg.App == APP_VOTE {
-				payload := new(vote.VoteInfo)
-				obj.DeepCopy(payload, msg.Payload)
-				request.AddMessage(NewMessage(msg.App, payload))
 			} else if msg.App == OP_MEDIATOR_CREATE {
 				payload := new(MediatorCreateOperation)
 				obj.DeepCopy(payload, msg.Payload)
 				request.AddMessage(NewMessage(msg.App, payload))
-			} else if msg.App == OP_MEDIATOR_COUNT_SET {
-				payload := new(MediatorCountSet)
+			} else if msg.App == OP_ACCOUNT_UPDATE {
+				payload := new(AccountUpdateOperation)
 				obj.DeepCopy(payload, msg.Payload)
 				request.AddMessage(NewMessage(msg.App, payload))
 			}
@@ -664,31 +628,7 @@ func (tx *Transaction) Clone() Transaction {
 	return *newTx
 }
 
-// AddTxOut adds a transaction output to the message.
-//func (msg *PaymentPayload) AddTxOut(to *Output) {
-//	msg.Output = append(msg.Output, to)
-//}
-// AddTxIn adds a transaction input to the message.
-//func (msg *PaymentPayload) AddTxIn(ti *Input) {
-//	msg.Input = append(msg.Input, ti)
-//}
-//const HashSize = 32
 const defaultTxInOutAlloc = 15
-
-//type Hash [HashSize]byte
-
-// DoubleHashH calculates hash(hash(b)) and returns the resulting bytes as a
-// Hash.
-// TxHash generates the Hash for the transaction.
-//func (msg *PaymentPayload) TxHash() common.Hash {
-//	// Encode the transaction and calculate double sha256 on the result.
-//	// Ignore the error returns since the only way the encode could fail
-//	// is being out of memory or due to nil pointers, both of which would
-//	// cause a run-time panic.
-//	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeStripped()))
-//	_ = msg.SerializeNoWitness(buf)
-//	return common.DoubleHashH(buf.Bytes())
-//}
 
 // SerializeNoWitness encodes the transaction to w in an identical manner to
 // Serialize, however even if the source transaction has inputs with witness
@@ -697,22 +637,6 @@ func (msg *PaymentPayload) SerializeNoWitness(w io.Writer) error {
 	//return msg.BtcEncode(w, 0, BaseEncoding)
 	return nil
 }
-
-// baseSize returns the serialized size of the transaction without accounting
-// for any witness data.
-//func (msg *PaymentPayload) baseSize() int {
-//	// Version 4 bytes + LockTime 4 bytes + Serialized varint size for the
-//	// number of transaction inputs and outputs.
-//	n := 8 + VarIntSerializeSize(uint64(len(msg.Inputs))) +
-//		VarIntSerializeSize(uint64(len(msg.Outputs)))
-//	for _, txIn := range msg.Inputs {
-//		n += txIn.SerializeSize()
-//	}
-//	for _, txOut := range msg.Outputs {
-//		n += txOut.SerializeSize()
-//	}
-//	return n
-//}
 
 func (msg *Transaction) baseSize() int {
 	b, _ := rlp.EncodeToBytes(msg)

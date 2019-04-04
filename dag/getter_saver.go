@@ -132,7 +132,7 @@ func (d *Dag) GetActiveMediatorNode(index int) *discover.Node {
 
 // author Albert·Gou
 func (d *Dag) GetActiveMediator(add common.Address) *core.Mediator {
-	if !d.GetGlobalProp().IsActiveMediator(add) {
+	if !d.IsActiveMediator(add) {
 		log.Debug(fmt.Sprintf("%v is not active mediator!", add.Str()))
 		return nil
 	}
@@ -213,6 +213,14 @@ func (dag *Dag) CurrentFeeSchedule() core.FeeSchedule {
 	return dag.GetGlobalProp().ChainParameters.CurrentFees
 }
 
+func (dag *Dag) GetChainParameters() core.ChainParameters {
+	return dag.GetGlobalProp().ChainParameters
+}
+
+func (dag *Dag) GetImmutableChainParameters() core.ImmutableChainParameters {
+	return dag.GetGlobalProp().ImmutableParameters
+}
+
 func (dag *Dag) GetUnitByHash(hash common.Hash) (*modules.Unit, error) {
 
 	unit, err := dag.unstableUnitRep.GetUnit(hash)
@@ -259,10 +267,22 @@ func (d *Dag) GetMediatorInfo(address common.Address) *modules.MediatorInfo {
 	return mi
 }
 
-func (d *Dag) IsActiveJury(addr common.Address) bool {
-	return d.GetGlobalProp().IsActiveJury(addr)
+func (d *Dag) JuryCount() int {
+	return 100 //todo test
+
+	juryList, err := d.unstableStateRep.GetJuryCandidateList()
+	if err != nil {
+		return len(juryList)
+	}
+	return 0
 }
 
 func (d *Dag) GetActiveJuries() []common.Address {
-	return d.GetGlobalProp().GetActiveJuries()
+	return nil
+	//return d.unstableStateRep.GetJuryCandidateList()
+}
+
+func (d *Dag) IsActiveJury(addr common.Address) bool {
+	return true //todo for test
+	return d.unstableStateRep.IsJury(addr)
 }

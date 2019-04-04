@@ -33,10 +33,10 @@ const Wallet_JS = `
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'getTranscations',
-			call: 'wallet_getTranscations',
-			params: 1
-		}),
+            name: 'getAddrTxHistory',
+            call: 'wallet_getAddrTxHistory',
+            params: 1
+        }),
 		new web3._extend.Method({
 			name: 'getAddrUtxos',
 			call: 'wallet_getAddrUtxos',
@@ -72,8 +72,8 @@ const Wallet_JS = `
 		new web3._extend.Method({
 			name: 'transferToken',
 			call: 'wallet_transferToken',
-			params: 7,
-			inputFormatter: [null,null,null,null,null,null,null]
+			params: 8,
+			inputFormatter: [null,null,null,null,null,null,null,null]
 		}),
 		new web3._extend.Method({
 			name: 'createProofTransaction',

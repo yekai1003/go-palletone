@@ -39,12 +39,12 @@ type IDag interface {
 	GetCommonByPrefix(prefix []byte) map[string][]byte
 
 	IsEmpty() bool
-	CurrentUnit(token modules.IDType16) *modules.Unit
+	CurrentUnit(token modules.AssetId) *modules.Unit
 	//SaveDag(unit *modules.Unit, isGenesis bool) (int, error)
 	VerifyHeader(header *modules.Header, seal bool) error
-	GetCurrentUnit(assetId modules.IDType16) *modules.Unit
+	GetCurrentUnit(assetId modules.AssetId) *modules.Unit
 	GetMainCurrentUnit() *modules.Unit
-	GetCurrentMemUnit(assetId modules.IDType16, index uint64) *modules.Unit
+	GetCurrentMemUnit(assetId modules.AssetId, index uint64) *modules.Unit
 	InsertDag(units modules.Units, txpool txspool.ITxPool) (int, error)
 	GetUnitByHash(hash common.Hash) (*modules.Unit, error)
 	HasHeader(common.Hash, uint64) bool
@@ -55,10 +55,10 @@ type IDag interface {
 	//GetPrefix(prefix string) map[string][]byte
 
 	// CurrentHeader retrieves the head header from the local chain.
-	CurrentHeader(token modules.IDType16) *modules.Header
+	CurrentHeader(token modules.AssetId) *modules.Header
 	GetUnitTransactions(hash common.Hash) (modules.Transactions, error)
 	GetUnitTxsHash(hash common.Hash) ([]common.Hash, error)
-	GetTransaction(hash common.Hash) (*modules.Transaction, common.Hash, uint64, uint64, error)
+	GetTransaction(hash common.Hash) (*modules.TransactionWithUnitInfo, error)
 	GetTransactionOnly(hash common.Hash) (*modules.Transaction, error)
 	GetTxSearchEntry(hash common.Hash) (*modules.TxLookupEntry, error)
 
@@ -80,6 +80,8 @@ type IDag interface {
 	GetConfig(name string) ([]byte, *modules.StateVersion, error)
 	GetContractState(contractid []byte, field string) ([]byte, *modules.StateVersion, error)
 	GetContractStatesById(id []byte) (map[string]*modules.ContractStateValue, error)
+	GetContractStatesByPrefix(id []byte, prefix string) (map[string]*modules.ContractStateValue, error)
+
 	GetUnitNumber(hash common.Hash) (*modules.ChainIndex, error)
 	//GetCanonicalHash(number uint64) (common.Hash, error)
 	//GetHeadHeaderHash() (common.Hash, error)
@@ -95,7 +97,9 @@ type IDag interface {
 	GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modules.Utxo, error)
 	GetAddr1TokenUtxos(addr common.Address, asset *modules.Asset) (map[modules.OutPoint]*modules.Utxo, error)
 	GetAllUtxos() (map[modules.OutPoint]*modules.Utxo, error)
-	GetAddrTransactions(addr string) (map[string]modules.Transactions, error)
+	GetAddrTransactions(addr common.Address) ([]*modules.TransactionWithUnitInfo, error)
+	GetAssetTxHistory(asset *modules.Asset) ([]*modules.TransactionWithUnitInfo, error)
+
 	GetContractTpl(templateID []byte) (version *modules.StateVersion, bytecode []byte, name string, path string, tplVersion string)
 	//WalletTokens(addr common.Address) (map[string]*modules.AccountToken, error)
 	//WalletBalance(address common.Address, assetid []byte, uniqueid []byte, chainid uint64) (uint64, error)
@@ -108,13 +112,8 @@ type IDag interface {
 	GetActiveMediatorNode(index int) *discover.Node
 	GetActiveMediatorNodes() map[string]*discover.Node
 
-	/* Vote */
-	//GetElectedMediatorsAddress() (map[string]uint64, error)
-	//GetAccountMediatorVote(address common.Address) []common.Address
-
 	GetAddrByOutPoint(outPoint *modules.OutPoint) (common.Address, error)
 	GetTxFee(pay *modules.Transaction) (*modules.AmountAsset, error)
-	// set groupsign
 	SetUnitGroupSign(unitHash common.Hash, groupSign []byte, txpool txspool.ITxPool) error
 
 	IsSynced() bool
@@ -138,11 +137,13 @@ type IDag interface {
 
 	//Light Palletone Subprotocal
 	GetLightHeaderByHash(headerHash common.Hash) (*modules.Header, error)
-	GetLightChainHeight(assetId modules.IDType16) uint64
+	GetLightChainHeight(assetId modules.AssetId) uint64
 	InsertLightHeader(headers []*modules.Header) (int, error)
 	GetAllLeafNodes() ([]*modules.Header, error)
 
 	HeadUnitTime() int64
 	HeadUnitNum() uint64
 	HeadUnitHash() common.Hash
+
+	UpdateSysParams() error
 }

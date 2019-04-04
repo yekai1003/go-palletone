@@ -21,12 +21,12 @@
 package modules
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
 
+	"bytes"
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/palletone/go-palletone/dag/errors"
 )
 
 var CoreAsset = NewPTNAsset()
@@ -36,8 +36,8 @@ var CoreAsset = NewPTNAsset()
 //默认的PTN资产，则AssetId=0，UniqueId=0
 type Asset struct {
 	//AssetId 资产类别,前26bit是symbol的base36编码，27-29是Symbol编码后字节长度，30-32bit为AssetType，剩下的是Txid的前12字节
-	AssetId  IDType16 `json:"asset_id"`
-	UniqueId IDType16 `json:"unique_id"` // every token has its unique id
+	AssetId  AssetId  `json:"asset_id"`
+	UniqueId UniqueId `json:"unique_id"` // every token has its unique id
 	//ChainId  uint64   `json:"chain_id"`  // main chain id or sub-chain id,read from toml config NetworkId
 }
 
@@ -51,15 +51,15 @@ const (
 
 func NewPTNAsset() *Asset {
 	//return &Asset{AssetId: PTNCOIN}
-	asset, err := NewAsset("PTN", AssetType_FungibleToken, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, IDType16{})
+	asset, err := NewAsset("PTN", AssetType_FungibleToken, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, UniqueIdType_Null, UniqueId{})
 	if err != nil {
 		return nil
 	}
 	return asset
 }
-func NewAsset(symbol string, assetType AssetType, decimal byte, requestId []byte, uniqueId IDType16) (*Asset, error) {
+func NewAsset(symbol string, assetType AssetType, decimal byte, requestId []byte, uidType UniqueIdType, uniqueId UniqueId) (*Asset, error) {
 	asset := &Asset{}
-	assetId, err := NewAssetId(symbol, assetType, decimal, requestId)
+	assetId, err := NewAssetId(symbol, assetType, decimal, requestId, uidType)
 	if err != nil {
 		return nil, err
 	}
@@ -68,25 +68,25 @@ func NewAsset(symbol string, assetType AssetType, decimal byte, requestId []byte
 	return asset, nil
 }
 
-func NewPTNIdType() IDType16 {
-	ptn, _ := NewAssetId("PTN", AssetType_FungibleToken, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+func NewPTNIdType() AssetId {
+	ptn, _ := NewAssetId("PTN", AssetType_FungibleToken, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, UniqueIdType_Null)
 	return ptn
 }
 func (asset *Asset) GetDecimal() byte {
-	_, _, decimal, _ := asset.AssetId.ParseAssetId()
+	_, _, decimal, _, _ := asset.AssetId.ParseAssetId()
 	return decimal
 }
 func (asset *Asset) String() string {
 	if asset.AssetId == PTNCOIN {
 		return "PTN"
 	}
-	//symbol, t, tx12 := asset.AssetId.ParseAssetId()
-	assetIdStr := asset.AssetId.ToAssetId()
-	if asset.UniqueId == ZeroIdType16() {
+	_, t, _, _, uidType := asset.AssetId.ParseAssetId()
+	assetIdStr := asset.AssetId.String()
+	if t != AssetType_NonFungibleToken {
 		return assetIdStr
 	}
 
-	return fmt.Sprintf("%s-%s", assetIdStr, asset.UniqueId.String())
+	return fmt.Sprintf("%s-%s", assetIdStr, asset.UniqueId.StringFriendly(uidType))
 }
 func StringToAsset(str string) (*Asset, error) {
 	asset := &Asset{}
@@ -100,7 +100,7 @@ func (asset *Asset) SetString(str string) error {
 	}
 	if !strings.Contains(str, "-") {
 		//ERC20, AssetID only
-		a, err := String2AssetId(str)
+		a, _, err := String2AssetId(str)
 		if err != nil {
 			return err
 		}
@@ -108,16 +108,17 @@ func (asset *Asset) SetString(str string) error {
 	} else {
 		//ERC721
 		strArray := strings.Split(str, "-")
-		a, err := String2AssetId(strArray[0])
+		a, uniqueIdType, err := String2AssetId(strArray[0])
 		if err != nil {
 			return err
 		}
 		asset.AssetId = a
-		uniqueId, err := hex.DecodeString(strArray[1])
+		uidStr := str[len(strArray[0])+1:]
+		uniqueId, err := String2UniqueId(uidStr, uniqueIdType)
 		if err != nil {
 			return err
 		}
-		asset.UniqueId.SetBytes(uniqueId)
+		asset.UniqueId = uniqueId
 	}
 
 	return nil
@@ -131,25 +132,31 @@ func (asset *Asset) IsEmpty() bool {
 }
 
 func (asset *Asset) Bytes() []byte {
-	data, err := rlp.EncodeToBytes(asset)
-	if err != nil {
-		return nil
-	}
-	return data
+	//data, err := rlp.EncodeToBytes(asset)
+	//if err != nil {
+	//	return nil
+	//}
+	//return data
+	b := asset.AssetId.Bytes()
+	return append(b, asset.UniqueId.Bytes()...)
 }
 
 func (asset *Asset) SetBytes(data []byte) error {
-	if err := rlp.DecodeBytes(data, asset); err != nil {
-		return err
+	if len(data) != 32 {
+		return errors.New("data length not equal 32")
 	}
+	asset.AssetId.SetBytes(data[:16])
+	asset.UniqueId.SetBytes(data[16:])
 	return nil
 }
-
+func (asset *Asset) IsSameAssetId(another *Asset) bool {
+	return bytes.Equal(asset.AssetId.Bytes(), another.AssetId.Bytes())
+}
 func (asset *Asset) IsSimilar(similar *Asset) bool {
-	if !strings.EqualFold(asset.AssetId.String(), similar.AssetId.String()) {
+	if !bytes.Equal(asset.AssetId.Bytes(), similar.AssetId.Bytes()) {
 		return false
 	}
-	if !strings.EqualFold(asset.UniqueId.String(), similar.UniqueId.String()) {
+	if !bytes.Equal(asset.UniqueId.Bytes(), similar.UniqueId.Bytes()) {
 		return false
 	}
 	return true

@@ -27,11 +27,11 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/hexutil"
 	"github.com/palletone/go-palletone/common/math"
-	"github.com/ethereum/go-ethereum/rlp"
 	mp "github.com/palletone/go-palletone/consensus/mediatorplugin"
 	"github.com/palletone/go-palletone/core/accounts"
 	"github.com/palletone/go-palletone/core/accounts/keystore"
@@ -69,14 +69,14 @@ func (s *PrivateAccountAPI) ListAccounts() []string {
 }
 
 // ListAccounts will return a list of addresses for accounts this node manages.
-func (s *PrivateAccountAPI) LlistAccounts() ([]string,error) {
+func (s *PrivateAccountAPI) LlistAccounts() ([]string, error) {
 	addresses := make([]string, 0)
 	for _, wallet := range s.am.Wallets() {
 		for _, account := range wallet.Accounts() {
 			addresses = append(addresses, account.Address.String())
 		}
 	}
-	return addresses,nil 
+	return addresses, nil
 }
 
 // rawWallet is a JSON representation of an accounts.Wallet interface, with its
@@ -294,6 +294,7 @@ func (s *PrivateAccountAPI) Sign(ctx context.Context, data hexutil.Bytes, addr s
 	return signature, nil
 }
 
+/*
 // EcRecover returns the address for the account that was used to create the signature.
 // Note, this function is compatible with eth_sign and personal_sign. As such it recovers
 // the address of:
@@ -321,7 +322,7 @@ func (s *PrivateAccountAPI) EcRecover(ctx context.Context, data, sig hexutil.Byt
 	recoveredAddr := crypto.PubkeyToAddress(pubKey)
 	return recoveredAddr, nil
 }
-
+*/
 // SignAndSendTransaction was renamed to SendTransaction. This method is deprecated
 // and will be removed in the future. It primary goal is to give clients time to update.
 func (s *PrivateAccountAPI) SignAndSendTransaction(ctx context.Context, args SendTxArgs, passwd string) (common.Hash, error) {
@@ -338,10 +339,13 @@ func (s *PrivateAccountAPI) TransferPtn(from, to string, amount decimal.Decimal,
 	}
 
 	// 解锁账户
-	duration := 1 * time.Second
-	err = fetchKeystore(s.am).TimedUnlock(accounts.Account{Address: fromAdd}, password, duration)
-	if err != nil {
-		return nil, err
+	ks := fetchKeystore(s.am)
+	if !ks.IsUnlock(fromAdd) {
+		duration := 1 * time.Second
+		err = ks.TimedUnlock(accounts.Account{Address: fromAdd}, password, duration)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return s.b.TransferPtn(from, to, amount, text)

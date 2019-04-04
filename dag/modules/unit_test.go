@@ -28,15 +28,15 @@ import (
 	"unsafe"
 
 	"fmt"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewUnit(t *testing.T) {
 	txs := make(Transactions, 0)
-	unit := NewUnit(&Header{Extra: []byte("hello"), Creationdate: time.Now().Unix()}, txs)
+	unit := NewUnit(&Header{Extra: []byte("hello"), Time: time.Now().Unix()}, txs)
 	hash := unit.Hash()
 	unit.UnitHash = common.Hash{}
 	if unit.UnitHash != (common.Hash{}) {
@@ -85,24 +85,23 @@ func TestCopyHeader(t *testing.T) {
 	addr := common.Address{}
 	addr.SetString("0000000011111111")
 
-	auth := Authentifier{
-		Address: addr,
-		R:       []byte("12345678901234567890"),
-		S:       []byte("09876543210987654321"),
-		V:       []byte("1"),
-	}
-	//author := Author{
-	//	Address:        addr,
-	//	Pubkey:         []byte("1234567890123456789"),
-	//	TxAuthentifier: auth,
+	//auth := Authentifier{
+	//	Address: addr,
+	//	R:       []byte("12345678901234567890"),
+	//	S:       []byte("09876543210987654321"),
+	//	V:       []byte("1"),
 	//}
+	auth := Authentifier{
+		Signature: []byte("1234567890123456789"),
+		PubKey:    []byte("1234567890123456789"),
+	}
 	w := make([]byte, 0)
 	w = append(w, []byte("sign")...)
-	assetID := IDType16{}
+	assetID := AssetId{}
 	assetID.SetBytes([]byte("0000000011111111"))
 	h := Header{
 		ParentsHash: []common.Hash{u1, u2},
-		//AssetIDs:    []IDType16{assetID},
+		//AssetIDs:    []AssetId{assetID},
 		Authors:     auth,
 		GroupSign:   w,
 		GroupPubKey: w,
@@ -144,9 +143,8 @@ func TestUnitSize(t *testing.T) {
 
 	h.TxRoot = h.Hash()
 	sig, _ := crypto.Sign(h.TxRoot[:], key)
-	au.R = sig[:32]
-	au.S = sig[32:64]
-	au.V = sig[64:]
+	au.Signature = sig
+	au.PubKey = crypto.CompressPubkey(&key.PublicKey)
 	h.Authors = au
 
 	log.Println("size: ", unsafe.Sizeof(h))
@@ -164,8 +162,8 @@ func TestOutPointToKey(t *testing.T) {
 }
 func TestHeaderPointer(t *testing.T) {
 	h := new(Header)
-	//h.AssetIDs = []IDType16{PTNCOIN}
-	h.Creationdate = time.Now().Unix()
+	//h.AssetIDs = []AssetId{PTNCOIN}
+	h.Time = time.Now().Unix()
 	h.Extra = []byte("jay")
 	index := new(ChainIndex)
 	index.AssetID = PTNCOIN
@@ -212,23 +210,23 @@ func TestHeaderRLP(t *testing.T) {
 	h.Number.AssetID = PTNCOIN
 	h.Number.Index = uint64(333333)
 	h.Extra = make([]byte, 20)
+	h.CryptoLib = []byte{0x1, 0x2}
 	h.ParentsHash = append(h.ParentsHash, h.TxRoot)
 	//tr := common.Hash{}
 	//tr = tr.SetString("c35639062e40f8891cef2526b387f42e353b8f403b930106bb5aa3519e59e35f")
 	h.TxRoot = common.HexToHash("c35639062e40f8891cef2526b387f42e353b8f403b930106bb5aa3519e59e35f")
 	sig, _ := crypto.Sign(h.TxRoot[:], key)
-	au.R = sig[:32]
-	au.S = sig[32:64]
-	au.V = sig[64:]
+	au.Signature = sig
+	au.PubKey = crypto.CompressPubkey(&key.PublicKey)
 	h.Authors = au
-	h.Creationdate = 123
+	h.Time = 123
 
-	t.Log("data",h)
+	t.Log("data", h)
 	bytes, err := rlp.EncodeToBytes(h)
 	assert.Nil(t, err)
 	t.Logf("Rlp data:%x", bytes)
 	h2 := &headerTemp{}
 	err = rlp.DecodeBytes(bytes, h2)
-	t.Log("data",h2)
+	t.Log("data", h2)
 	assert.Equal(t, h, h2)
 }

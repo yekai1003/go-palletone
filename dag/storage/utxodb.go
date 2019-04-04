@@ -47,7 +47,7 @@ type IUtxoDb interface {
 	//GetUtxoPkScripHexByTxhash(txhash common.Hash, mindex, outindex uint32) (string, error)
 	//GetAddrOutput(addr string) ([]modules.Output, error)
 	GetAddrOutpoints(addr common.Address) ([]modules.OutPoint, error)
-	GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modules.Utxo, error)
+	GetAddrUtxos(addr common.Address, asset *modules.Asset) (map[modules.OutPoint]*modules.Utxo, error)
 	GetAllUtxos() (map[modules.OutPoint]*modules.Utxo, error)
 	SaveUtxoEntity(outpoint *modules.OutPoint, utxo *modules.Utxo) error
 	SaveUtxoView(view map[modules.OutPoint]*modules.Utxo) error
@@ -163,32 +163,6 @@ func (utxodb *UtxoDb) DeleteUtxo(outpoint *modules.OutPoint) error {
 	return nil
 }
 
-//@Yiran
-//func (utxodb *UtxoDb) SaveUtxoSnapshot(index *modules.ChainIndex) error {
-//	//0. examine wrong calling
-//	if index.Index%modules.TERMINTERVAL != 0 {
-//		return errors.New("SaveUtxoSnapshot must wait until last term period end")
-//	}
-//	//1. get all utxo
-//	utxos, err := utxodb.GetAllUtxos()
-//	if err != nil {
-//		return util.ErrorLogHandler(err, "utxodb.GetAllUtxos")
-//	}
-//	PTNutxos := make([]modules.Utxo, 0)
-//	for _, utxo := range utxos {
-//		if utxo.Asset.AssetId == modules.PTNCOIN {
-//			PTNutxos = append(PTNutxos, *utxo)
-//		}
-//	}
-//	//2. store utxo
-//	key := util.KeyConnector([]byte(constants.UTXOSNAPSHOT_PREFIX), ConvertBytes(index))
-//	return utxodb.SaveUtxoEntities(key, &PTNutxos)
-//}
-
-//func (utxodb *UtxoDb) GetUtxoSnapshot(index []byte) error {
-//
-//}
-
 // ###################### SAVE IMPL END ######################
 
 // ###################### GET IMPL START ######################
@@ -242,8 +216,8 @@ func (utxodb *UtxoDb) GetUtxoEntry(outpoint *modules.OutPoint) (*modules.Utxo, e
 //	}
 //	return outputs, nil
 //}
-
-func (db *UtxoDb) GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modules.Utxo, error) {
+//GetAddrUtxos if asset is nil, query all Asset from address
+func (db *UtxoDb) GetAddrUtxos(addr common.Address, asset *modules.Asset) (map[modules.OutPoint]*modules.Utxo, error) {
 	allutxos := make(map[modules.OutPoint]*modules.Utxo, 0)
 	outpoints, err := db.GetAddrOutpoints(addr)
 	if err != nil {
@@ -252,7 +226,9 @@ func (db *UtxoDb) GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modul
 	for _, out := range outpoints {
 		if utxo, err := db.GetUtxoEntry(&out); err == nil {
 			if !utxo.IsSpent() {
-				allutxos[out] = utxo
+				if asset == nil || asset.IsSimilar(utxo.Asset) {
+					allutxos[out] = utxo
+				}
 			}
 		}
 	}

@@ -92,7 +92,7 @@ func newTestProtocolManager(mode downloader.SyncMode, blocks int, idag dag.IDag,
 	}
 	genesisUint, _ := idag.GetUnitByNumber(index0)
 
-	pm, err := NewProtocolManager(mode, DefaultConfig.NetworkId, "ptn", &testTxPool{added: newtx}, idag, typemux, pro, genesisUint, nil)
+	pm, err := NewProtocolManager(mode, DefaultConfig.NetworkId, "ptn", &testTxPool{added: newtx}, idag, typemux, pro, genesisUint, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -206,8 +206,8 @@ func (p *testTxPool) GetSortedTxs(hash common.Hash) ([]*modules.TxPoolTransactio
 func (p *testTxPool) SendStoredTxs(hashs []common.Hash) error {
 	return nil
 }
-func (p *testTxPool) Stats() (int, int) {
-	return 0, 0
+func (p *testTxPool) Stats() (int, int, int) {
+	return 0, 0, 0
 }
 
 func (p *testTxPool) Stop() {}
@@ -362,7 +362,7 @@ func unitForTest(index int) *modules.Unit {
 	header.Number.AssetID = modules.PTNCOIN
 	header.Number.IsMain = true
 	header.Number.Index = uint64(index)
-	header.Authors = modules.Authentifier{common.Address{}, []byte{}, []byte{}, []byte{}}
+	header.Authors = modules.Authentifier{[]byte{}, []byte{}}
 	header.GroupSign = []byte{}
 	header.GroupPubKey = []byte{}
 	//tx, _ := NewCoinbaseTransaction()
@@ -378,7 +378,7 @@ func newGenesisForTest(db ptndb.Database) *modules.Unit {
 	header.Number.AssetID = modules.PTNCOIN
 	header.Number.IsMain = true
 	header.Number.Index = 0
-	header.Authors = modules.Authentifier{common.Address{}, []byte{}, []byte{}, []byte{}}
+	header.Authors = modules.Authentifier{[]byte{}, []byte{}}
 	header.GroupSign = []byte{}
 	header.GroupPubKey = []byte{}
 	//tx, _ := NewCoinbaseTransaction()
@@ -401,7 +401,7 @@ func newDag(memdb ptndb.Database, gunit *modules.Unit, number int) (modules.Unit
 		header.Number.AssetID = par.UnitHeader.Number.AssetID
 		header.Number.IsMain = par.UnitHeader.Number.IsMain
 		header.Number.Index = par.UnitHeader.Number.Index + 1
-		header.Authors = modules.Authentifier{common.Address{}, []byte{}, []byte{}, []byte{}}
+		header.Authors = modules.Authentifier{[]byte{}, []byte{}}
 		header.GroupSign = []byte{}
 		header.GroupPubKey = []byte{}
 		//tx, _ := NewCoinbaseTransaction()
@@ -563,12 +563,12 @@ func NewUnit(header *modules.Header, txs modules.Transactions) *modules.Unit {
 	u.UnitHash = u.Hash()
 	return u
 }
-func NewHeader(parents []common.Hash, asset []modules.IDType16, extra []byte) *modules.Header {
+func NewHeader(parents []common.Hash, asset []modules.AssetId, extra []byte) *modules.Header {
 	hashs := make([]common.Hash, 0)
 	hashs = append(hashs, parents...) // 切片指针传递的问题，这里得再review一下。
 	var b []byte
-	//return &modules.Header{ParentsHash: hashs, AssetIDs: asset, Extra: append(b, extra...), Creationdate: time.Now().Unix()}
-	return &modules.Header{ParentsHash: hashs, Extra: append(b, extra...), Creationdate: time.Now().Unix()}
+	//return &modules.Header{ParentsHash: hashs, AssetIDs: asset, Extra: append(b, extra...), Time: time.Now().Unix()}
+	return &modules.Header{ParentsHash: hashs, Extra: append(b, extra...), Time: time.Now().Unix()}
 }
 func NewCoinbaseTransaction() (*modules.Transaction, error) {
 	input := &modules.Input{}

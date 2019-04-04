@@ -16,9 +16,9 @@ type TxPoolTxJson struct {
 	Froms        []*OutPointJson `json:"froms"`
 	CreationDate time.Time       `json:"creation_date"`
 	Priority     float64         `json:"priority"` // 打包的优先级
-	Nonce        uint64          `json:"nonce"`
 	Pending      bool            `json:"pending"`
 	Confirmed    bool            `json:"confirmed"`
+	IsOrphan     bool            `json:"is_orphan"`
 	Index        int             `json:"index"` // index 是该tx在优先级堆中的位置
 	Extra        []byte          `json:"extra"`
 }
@@ -55,15 +55,15 @@ func ConvertTxPoolTx2Json(tx *modules.TxPoolTransaction, hash common.Hash) *TxPo
 	return &TxPoolTxJson{
 		TxHash:     tx.Tx.Hash().String(),
 		UnitHash:   hex_hash,
-		Payment:    &payJson,
+		Payment:    payJson,
 		TxMessages: ConvertMegs2Json(tx.Tx.TxMessages),
 
 		Froms:        froms,
 		CreationDate: tx.CreationDate,
 		Priority:     tx.GetPriorityfloat64(),
-		Nonce:        tx.Nonce,
 		Pending:      tx.Pending,
 		Confirmed:    tx.Confirmed,
+		IsOrphan:     tx.IsOrphan,
 		Extra:        tx.Extra[:],
 	}
 }

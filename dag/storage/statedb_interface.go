@@ -29,7 +29,7 @@ import (
 type IStateDb interface {
 	GetConfig(name string) ([]byte, *modules.StateVersion, error)
 	GetPrefix(prefix []byte) map[string][]byte
-	SaveConfig(confs []modules.ContractWriteSet, stateVersion *modules.StateVersion) error
+	//SaveConfig(confs []modules.ContractWriteSet, stateVersion *modules.StateVersion) error
 	//SaveAssetInfo(assetInfo *modules.AssetInfo) error
 	//GetAssetInfo(assetId *modules.Asset) (*modules.AssetInfo, error)
 	SaveContract(contract *modules.Contract) error
@@ -50,6 +50,7 @@ type IStateDb interface {
 	GetContractState(id []byte, field string) ([]byte, *modules.StateVersion, error)
 	GetTplAllState(id []byte) []*modules.ContractReadSet
 	//GetContractAllState() []*modules.ContractReadSet
+	GetContractStatesByPrefix(id []byte, prefix string) (map[string]*modules.ContractStateValue, error)
 	GetContractStatesById(id []byte) (map[string]*modules.ContractStateValue, error)
 	GetTplState(id []byte, field string) (*modules.StateVersion, []byte)
 	GetContract(id []byte) (*modules.Contract, error)
@@ -65,22 +66,13 @@ type IStateDb interface {
 	StoreAccountInfo(address common.Address, info *modules.AccountInfo) error
 	UpdateAccountBalance(addr common.Address, addAmount int64) error
 	GetAccountBalance(address common.Address) uint64
-	//AddVote2Account(address common.Address, voteInfo vote.VoteInfo) error
-	//GetAccountVoteInfo(address common.Address, voteType uint8) [][]byte
 	GetMinFee() (*modules.AmountAsset, error)
-	//GetSortedMediatorVote(returnNumber int) (map[string]uint64, error)
-	//GetVoterList(voteType uint8, MinTermLimit uint16) []common.Address
-	//UpdateVoterList(voter common.Address, voteType uint8, term uint16) error
-	//GetAccountMediatorVote(voterAddress common.Address) ([]common.Address, uint64, error)
-	AppendVotedMediator(voter, mediator common.Address) error
 
 	// world state chainIndex
-	//GetCurrentChainIndex(assetId modules.IDType16) (*modules.ChainIndex, error)
+	//GetCurrentChainIndex(assetId modules.AssetId) (*modules.ChainIndex, error)
 	//保存当前最新单元的高度，即使是未稳定的单元，也会更新
 	//SaveChainIndex(index *modules.ChainIndex) error
-	//GetCurrentUnit(assetId modules.IDType16) *modules.Unit
-
-	CreateUserVote(voter common.Address, detail [][]byte, bHash []byte) error
+	//GetCurrentUnit(assetId modules.AssetId) *modules.Unit
 
 	StoreMediator(med *core.Mediator) error
 	StoreMediatorInfo(add common.Address, mi *modules.MediatorInfo) error
@@ -95,5 +87,10 @@ type IStateDb interface {
 	IsMediator(address common.Address) bool
 	LookupAccount() map[common.Address]*modules.AccountInfo
 	RetrieveMediatorInfo(address common.Address) (*modules.MediatorInfo, error)
-	UpdateDesiredMediatorCount(account common.Address, mediatorCountSet uint8) error
+	UpdateAccountInfo(account common.Address, accountUpdateOp *modules.AccountUpdateOperation) error
+
+	GetJuryCandidateList() ([]string, error)
+	IsInJuryCandidateList(address common.Address) bool
+
+	UpdateSysParams(ver *modules.StateVersion) error
 }

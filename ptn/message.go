@@ -354,7 +354,7 @@ func (pm *ProtocolManager) NewBlockMsg(msg p2p.Msg, p *peer) error {
 
 	unit := &modules.Unit{}
 	if err := json.Unmarshal(data, &unit); err != nil {
-		log.Info("ProtocolManager", "NewBlockMsg json ummarshal err:", err)
+		log.Info("ProtocolManager", "NewBlockMsg json ummarshal err:", err, "data", string(data))
 		return err
 	}
 
@@ -461,18 +461,6 @@ func (pm *ProtocolManager) TxMsg(msg p2p.Msg, p *peer) error {
 	return nil
 }
 
-//func (pm *ProtocolManager) ConsensusMsg(msg p2p.Msg, p *peer) error {
-//	var consensusmsg string
-//	if err := msg.Decode(&consensusmsg); err != nil {
-//		return errResp(ErrDecode, "msg %v: %v", msg, err)
-//	}
-//	log.Info("ConsensusMsg recv:", consensusmsg)
-//	if consensusmsg == "A" {
-//		p.SendConsensus("Hello I received A")
-//	}
-//	return nil
-//}
-
 func (pm *ProtocolManager) NewProducedUnitMsg(msg p2p.Msg, p *peer) error {
 	// Retrieve and decode the propagated new produced unit
 	data := []byte{}
@@ -550,7 +538,6 @@ func (pm *ProtocolManager) ContractMsg(msg p2p.Msg, p *peer) error {
 		log.Info("===ContractMsg===", "err:", err)
 		return errResp(ErrDecode, "%v: %v", msg, err)
 	}
-
 	log.Info("===ContractMsg===", "event type:", event.CType)
 	err := pm.contractProc.ProcessContractEvent(&event)
 	if err != nil {
@@ -565,7 +552,7 @@ func (pm *ProtocolManager) ElectionMsg(msg p2p.Msg, p *peer) error {
 		log.Info("===ElectionMsg===", "err:", err)
 		return errResp(ErrDecode, "%v: %v", msg, err)
 	}
-	log.Info("===ElectionMsg===", "event ", evs)
+	//log.Info("===ElectionMsg===", "event ", evs)
 	event, err := evs.ToElectionEvent()
 	if err != nil {
 		log.Debug("ElectionMsg, ToElectionEvent fail")
@@ -573,11 +560,30 @@ func (pm *ProtocolManager) ElectionMsg(msg p2p.Msg, p *peer) error {
 	}
 	result, err := pm.contractProc.ProcessElectionEvent(event)
 	if err != nil {
-		log.Debug("ElectionMsg", "ProcessElectionRequestEvent error:", err)
+		log.Debug("ElectionMsg", "ProcessElectionEvent error:", err)
 	} else {
 		if event.EType == jury.ELECTION_EVENT_REQUEST {
 			if result != nil {
 				p.SendElectionEvent(*result)
+			}
+		}
+	}
+	return nil
+}
+
+func (pm *ProtocolManager) AdapterMsg(msg p2p.Msg, p *peer) error {
+	var event jury.AdapterEvent
+	if err := msg.Decode(&event); err != nil {
+		log.Info("===AdapterMsg===", "err:", err)
+		return errResp(ErrDecode, "%v: %v", msg, err)
+	}
+	result, err := pm.contractProc.ProcessAdapterEvent(&event)
+	if err != nil {
+		log.Debug("AdapterMsg", "ProcessAdapterEvent error:", err)
+	} else {
+		if event.AType == jury.ADAPTER_EVENT_REQUEST {
+			if result != nil {
+				p.SendAdapterEvent(*result)
 			}
 		}
 	}

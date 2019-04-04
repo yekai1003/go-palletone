@@ -28,9 +28,9 @@ import (
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/core/accounts/keystore"
 	dagcommon "github.com/palletone/go-palletone/dag/common"
+	"github.com/palletone/go-palletone/dag/dagconfig"
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/dag/txspool"
-	"github.com/palletone/go-palletone/dag/dagconfig"
 )
 
 func (dag *Dag) setUnitHeader(pendingUnit *modules.Unit) {
@@ -117,7 +117,7 @@ func (dag *Dag) GenerateUnit(when time.Time, producer common.Address, groupPubKe
 	pendingUnit := &newUnits[0]
 	// dag.setUnitHeader(pendingUnit)
 
-	pendingUnit.UnitHeader.Creationdate = when.Unix()
+	pendingUnit.UnitHeader.Time = when.Unix()
 	pendingUnit.UnitHeader.ParentsHash[0] = dag.HeadUnitHash()
 	pendingUnit.UnitHeader.Number.Index = dag.HeadUnitNum() + 1
 	//currentHash := dag.HeadUnitHash() //dag.GetHeadUnitHash()

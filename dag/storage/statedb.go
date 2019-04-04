@@ -80,12 +80,10 @@ func (db *StateDb) GetPrefix(prefix []byte) map[string][]byte {
 
 // ######################### GET IMPL END ###########################
 
-// author albert·gou
 func (statedb *StateDb) StoreMediator(med *core.Mediator) error {
 	return StoreMediator(statedb.db, med)
 }
 
-// author albert·gou
 func (statedb *StateDb) StoreMediatorInfo(add common.Address, mi *modules.MediatorInfo) error {
 	return StoreMediatorInfo(statedb.db, add, mi)
 }
@@ -94,7 +92,6 @@ func (statedb *StateDb) RetrieveMediatorInfo(address common.Address) (*modules.M
 	return RetrieveMediatorInfo(statedb.db, address)
 }
 
-// author albert·gou
 func (statedb *StateDb) RetrieveMediator(address common.Address) (*core.Mediator, error) {
 	return RetrieveMediator(statedb.db, address)
 }
@@ -110,7 +107,7 @@ func (statedb *StateDb) RetrieveMediator(address common.Address) (*core.Mediator
 //	}
 //	return nil
 //}
-//func (statedb *StateDb) GetCurrentChainIndex(assetId modules.IDType16) (*modules.ChainIndex, error) {
+//func (statedb *StateDb) GetCurrentChainIndex(assetId modules.AssetId) (*modules.ChainIndex, error) {
 //	// get current chainIndex
 //	key := constants.CURRENTCHAININDEX_PREFIX + assetId.String()
 //	bytes, err := statedb.db.Get([]byte(key))
@@ -124,22 +121,18 @@ func (statedb *StateDb) RetrieveMediator(address common.Address) (*core.Mediator
 //	return chainIndex, nil
 //}
 
-// author albert·gou
 func (statedb *StateDb) GetMediatorCount() int {
 	return GetMediatorCount(statedb.db)
 }
 
-// author albert·gou
 func (statedb *StateDb) IsMediator(address common.Address) bool {
 	return IsMediator(statedb.db, address)
 }
 
-// author albert·gou
 func (statedb *StateDb) GetMediators() map[common.Address]bool {
 	return GetMediators(statedb.db)
 }
 
-// author albert·gou
 func (statedb *StateDb) LookupMediator() map[common.Address]*core.Mediator {
 	return LookupMediator(statedb.db)
 }
@@ -197,4 +190,114 @@ func (statedb *StateDb) IsInJuryCandidateList(address common.Address) bool {
 		}
 	}
 	return false
+}
+
+func (statedb *StateDb) UpdateSysParams(version *modules.StateVersion) error {
+	//基金会单独修改的
+	var err error
+	modifies, err := statedb.GetSysParamWithoutVote()
+	if err != nil {
+		return err
+	}
+	//基金会发起投票的
+	info, err := statedb.GetSysParamsWithVotes()
+	if err != nil {
+		return err
+	}
+	if modifies == nil && info == nil {
+		return nil
+	}
+	//获取当前的version
+	if len(modifies) > 0 {
+		for _, v := range modifies {
+			err = statedb.SaveSysConfig(v.Key, []byte(v.Value), version)
+			if err != nil {
+				return err
+			}
+		}
+		//将基金会当前单独修改的制为nil
+		err = statedb.SaveSysConfig("sysParam", nil, version)
+		if err != nil {
+			return err
+		}
+	}
+	if info == nil {
+		return nil
+	}
+	foundAddr, _, err := statedb.GetConfig("FoundationAddress")
+	if err != nil {
+		return err
+	}
+	if info.CreateAddr != string(foundAddr) {
+		return fmt.Errorf("only foundation can call this function")
+	}
+	if !info.IsVoteEnd {
+		return nil
+	}
+	for _, v1 := range info.SupportResults {
+		for _, v2 := range v1.VoteResults {
+			//TODO
+			if v2.Num >= info.LeastNum {
+				err = statedb.SaveSysConfig(v1.TopicTitle, []byte(v2.SelectOption), version)
+				if err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
+	//将基金会当前投票修改的制为nil
+	err = statedb.SaveSysConfig("sysParams", nil, version)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (statedb *StateDb) GetSysParamWithoutVote() ([]*modules.FoundModify, error) {
+	val, _, err := statedb.GetConfig("sysParam")
+	if err != nil {
+		return nil, err
+	}
+	var modifies []*modules.FoundModify
+	if val == nil {
+		return nil, err
+	} else if len(val) > 0 {
+		err := json.Unmarshal(val, &modifies)
+		if err != nil {
+			return nil, err
+		}
+		return modifies, nil
+	} else {
+		return nil, nil
+	}
+}
+
+func (statedb *StateDb) GetSysParamsWithVotes() (*modules.SysTokenIDInfo, error) {
+	val, _, err := statedb.GetConfig("sysParams")
+	if err != nil {
+		return nil, err
+	}
+	info := &modules.SysTokenIDInfo{}
+	if val == nil {
+		return nil, err
+	} else if len(val) > 0 {
+		err := json.Unmarshal(val, info)
+		if err != nil {
+			return nil, err
+		}
+		return info, nil
+	} else {
+		return nil, nil
+	}
+}
+
+func (statedb *StateDb) SaveSysConfig(key string, val []byte, ver *modules.StateVersion) error {
+	//SaveContractState(id []byte, name string, value interface{}, version *modules.StateVersion)
+	id := syscontract.SysConfigContractAddress.Bytes21()
+	err := statedb.SaveContractState(id, key, val, ver)
+	if err != nil {
+		return err
+	}
+	return nil
 }

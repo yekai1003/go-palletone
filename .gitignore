@@ -7,10 +7,11 @@
 /tmp
 **/data1
 *.log
+!bdd/node/*
 */**/*un~
 */**/*.test
 log.txt
-UTC--*
+#UTC--*
 *un~
 .DS_Store
 */**/.DS_Store
@@ -56,19 +57,18 @@ bin/
 #run temp file
 /cmd/gptn/data1
 /cmd/gptn/log
-**/leveldb/
+cmd/console/leveldb/
 *.rlp
 **/ptn-config.toml
 dag/common/unit.go.orig
 cmd/test/
+cmd/console/**/leveldb/
+palletone/
 
-palletone\.sublime-project
-
-palletone\.sublime-workspace
 dag/common/utxo.go.orig
 
 *.sublime-project
-
+core/accounts/keystore/UTC*
 *.sublime-workspace
 cmd/gptn/gptn/
 cmd/gptn/keystore/

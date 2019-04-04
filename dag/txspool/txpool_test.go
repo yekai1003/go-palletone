@@ -20,8 +20,10 @@
 package txspool
 
 import (
+	"encoding/hex"
 	"fmt"
-	"math/big"
+	"math/rand"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -74,11 +76,10 @@ func NewUnitDag4Test() *UnitDag4Test {
 	//idagdb.PutHeadUnitHash()
 	mutex := new(sync.RWMutex)
 
-	ud := &UnitDag4Test{db, utxodb, *mutex, nil, 10000, new(event.Feed), nil}
-	ud.outpoints = make(map[string]map[modules.OutPoint]*modules.Utxo)
+	ud := &UnitDag4Test{db, utxodb, *mutex, nil, 10000, new(event.Feed), make(map[string]map[modules.OutPoint]*modules.Utxo)}
 	return ud
 }
-func (ud *UnitDag4Test) CurrentUnit(token modules.IDType16) *modules.Unit {
+func (ud *UnitDag4Test) CurrentUnit(token modules.AssetId) *modules.Unit {
 	return modules.NewUnit(&modules.Header{
 		Number: &modules.ChainIndex{AssetID: token},
 		Extra:  []byte("test pool"),
@@ -154,6 +155,25 @@ func (ud *UnitDag4Test) GetTransactionOnly(hash common.Hash) (*modules.Transacti
 	return nil, nil
 }
 
+// create txs
+func createTxs(address string) []*modules.Transaction {
+	txs := make([]*modules.Transaction, 0)
+
+	sign, _ := hex.DecodeString("2c731f854ef544796b2e86c61b1a9881a0148da0c1001f0da5bd2074d2b8360367e2e0a57de91a5cfe92b79721692741f47588036cf0101f34dab1bfda0eb030")
+	pubKey, _ := hex.DecodeString("0386df0aef707cc5bc8d115c2576f844d2734b05040ef2541e691763f802092c09")
+	unlockScript := tokenengine.GenerateP2PKHUnlockScript(sign, pubKey)
+	a := modules.NewPTNAsset()
+	addr, _ := common.StringToAddress(address)
+	lockScript := tokenengine.GenerateLockScript(addr)
+	for j := 0; j < 16; j++ {
+		tx := modules.NewTransaction([]*modules.Message{})
+		tx.AddMessage(modules.NewMessage(modules.APP_PAYMENT, modules.NewPaymentPayload([]*modules.Input{modules.NewTxIn(modules.NewOutPoint(common.Hash{}, 0, 0), unlockScript)},
+			[]*modules.Output{modules.NewTxOut(uint64(j+1), lockScript, a)})))
+		txs = append(txs, tx)
+	}
+	return txs
+}
+
 // Tests that if the transaction count belonging to multiple accounts go above
 // some hard threshold, if they are under the minimum guaranteed slot count then
 // the transactions are still kept.
@@ -164,90 +184,19 @@ func TestTransactionAddingTxs(t *testing.T) {
 
 	// Create the pool to test the limit enforcement with
 	db, _ := palletdb.NewMemDatabase()
-	//l := log.NewTestLog()
 	utxodb := storage.NewUtxoDb(db)
 	mutex := new(sync.RWMutex)
 	unitchain := &UnitDag4Test{db, utxodb, *mutex, nil, 10000, new(event.Feed), nil}
 	config := testTxPoolConfig
 	config.GlobalSlots = 4096
-	var pending_cache, queue_cache, all, origin int
-	pool := NewTxPool(config, unitchain)
 
+	pool := NewTxPool(config, unitchain)
 	defer pool.Stop()
 
-	txs := modules.Transactions{}
-
-	msgs := make([]*modules.Message, 0)
-	msgs1 := make([]*modules.Message, 0)
-	addr := new(common.Address)
-	addr.SetString("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-
-	script := tokenengine.GenerateP2PKHLockScript(addr.Bytes())
-	// step. compute total income
-
-	totalIncome := uint64(100000000)
-	// step2. create payload
-	createT := big.Int{}
-
-	outpoint := modules.OutPoint{
-		// TxHash: ,
-		MessageIndex: 2,
-		OutIndex:     3,
-	}
-	input := modules.Input{
-		PreviousOutPoint: &outpoint,
-		SignatureScript:  []byte("xxxxxxxxxx"),
-		Extra:            createT.SetInt64(time.Now().Unix()).Bytes(),
-	}
-	time.Sleep(1 * time.Second)
-	input1 := modules.Input{
-		PreviousOutPoint: &outpoint,
-		SignatureScript:  []byte("cccccccccc"),
-		Extra:            createT.SetInt64(time.Now().Unix()).Bytes(),
-	}
-	time.Sleep(1 * time.Second)
-	input2 := modules.Input{
-		PreviousOutPoint: &outpoint,
-		SignatureScript:  []byte("vvvvvvvvvv"),
-		Extra:            createT.SetInt64(time.Now().Unix()).Bytes(),
-	}
-	output := modules.Output{
-		Value: totalIncome,
-		Asset: &modules.Asset{
-			AssetId: modules.BTCCOIN,
-		},
-		PkScript: script,
-	}
-
-	payload0 := &modules.PaymentPayload{
-		Inputs:  []*modules.Input{&input},
-		Outputs: []*modules.Output{&output},
-	}
-	payload1 := &modules.PaymentPayload{
-		Inputs:  []*modules.Input{&input1},
-		Outputs: []*modules.Output{&output},
-	}
-	payload2 := &modules.PaymentPayload{
-		Inputs:  []*modules.Input{&input2},
-		Outputs: []*modules.Output{&output},
-	}
-	for i := 0; i < 16; i++ {
-		if i == 0 {
-			msgs = append(msgs, modules.NewMessage(modules.APP_PAYMENT, payload0))
-		}
-		if i == 1 {
-			msgs = append(msgs, modules.NewMessage(modules.APP_PAYMENT, payload1))
-		}
-		if i == 2 {
-			msgs = append(msgs, modules.NewMessage(modules.APP_PAYMENT, payload2))
-		}
-		msgs = append(msgs, modules.NewMessage(modules.APP_DATA, &modules.DataPayload{MainData: []byte(fmt.Sprintf("text%d%v", i, time.Now()))}))
-	}
-
-	for j := 0; j < 16; j++ {
-		txs = append(txs, transaction(append(msgs1, msgs[j])))
-	}
-	fmt.Println("range txs start.... ", time.Now().Unix()-t0.Unix())
+	var pending_cache, queue_cache, all, origin int
+	address := "P13pBrshF6JU7QhMmzJjXx3mWHh13YHAUAa"
+	txs := createTxs(address)
+	fmt.Println("range txs start...  , spent time:", time.Since(t0))
 	// Import the batch and verify that limits have been enforced
 	//	pool.AddRemotes(txs)
 	for i, tx := range txs {
@@ -290,7 +239,7 @@ func TestTransactionAddingTxs(t *testing.T) {
 		if len(list) != 16 {
 			t.Errorf("addr %x: total pending transactions mismatch: have %d, want %d", hash.String(), len(list), 16)
 		} else {
-			log.Debug("account matched.", "pending addr:", addr.String(), "amont:", len(list))
+			log.Debug("account matched.", "pending addr:", address, "amont:", len(list))
 		}
 	}
 	fmt.Println("defer start.... ", time.Now().Unix()-t0.Unix())
@@ -311,7 +260,8 @@ func TestTransactionAddingTxs(t *testing.T) {
 				}
 			}
 			all = len(txs)
-			for _, tx := range p.all {
+			poolTxs := pool.AllTxpoolTxs()
+			for _, tx := range poolTxs {
 				if tx.Pending {
 					pending_cache++
 				} else {
@@ -336,17 +286,9 @@ func TestTransactionAddingTxs(t *testing.T) {
 		} else {
 			log.Error("test added tx failed.")
 		}
-		log.Debugf("data:%d,%d,%d,%d,%d", origin, all, len(pool.all), pending_cache, queue_cache)
+		log.Debugf("data:%d,%d,%d,%d,%d", origin, all, pool.AllLength(), pending_cache, queue_cache)
 		fmt.Println("defer over.... spending time：", time.Now().Unix()-t0.Unix())
 	}(pool)
-}
-func transaction(msg []*modules.Message) *modules.Transaction {
-	return pricedTransaction(msg)
-}
-func pricedTransaction(msgs []*modules.Message) *modules.Transaction {
-	tx := modules.NewTransaction(msgs)
-	//tx.SetHash(rlp.RlpHash(tx))
-	return tx
 }
 
 func TestUtxoViewPoint(t *testing.T) {
@@ -371,25 +313,21 @@ func TestGetProscerTx(t *testing.T) {
 	us = append(us, &user{append(list, 1, 2), 2, append(list, 3, 4)}, &user{append(list, 3), 1, append(list, 5)}, &user{append(list, 4), 0, append(list, 7)}, &user{append(list, 7), 4, append(list, 8)}, &user{append(list, 8), 5, append(list, 9)}, &user{append(list, 0), 6, append(list, 1, 2)})
 
 	l := getProscerTx(&user{append(list, 3), 1, append(list, 5)}, us)
+	fmt.Println("getProscer:", l)
 	// 去重
-	for i := 0; i < len(l)-1; i++ {
-		for j := i + 1; j < len(l); j++ {
-			if l[i] == l[j] {
-				fmt.Println("重复", j, l)
-				item := l[:i]
-				item = append(item, l[j:]...)
-				l = make([]int, 0)
-				l = item[:]
-				fmt.Println("重复", j, l)
-			}
-		}
+	m := make(map[int]int)
+	for _, u := range l {
+		m[u] = u
 	}
+	l = make([]int, 0)
+	for _, u := range m {
+		l = append(l, u)
+	}
+
 	if len(l) < 1 {
 		fmt.Println("failed.", l)
 	} else {
-		for _, n := range l {
-			fmt.Println("number:", n)
-		}
+		fmt.Println("rm repeat:", l)
 	}
 }
 
@@ -421,6 +359,50 @@ func getProscerTx(this *user, us []*user) []int {
 			}
 		}
 	}
-
 	return list
+}
+
+func TestPriorityHeap(t *testing.T) {
+	txs := createTxs("P13pBrshF6JU7QhMmzJjXx3mWHh13YHAUAa")
+	p_txs := make([]*modules.TxPoolTransaction, 0)
+	list := new(priorityHeap)
+	for _, tx := range txs {
+		priority := rand.Float64()
+		str := strconv.FormatFloat(priority, 'f', -1, 64)
+		ptx := &modules.TxPoolTransaction{Tx: tx, Priority_lvl: str}
+		p_txs = append(p_txs, ptx)
+		list.Push(ptx)
+	}
+	count := 0
+	biger := new(modules.TxPoolTransaction)
+	bad := new(modules.TxPoolTransaction)
+	for list.Len() > 0 {
+		inter := list.Pop()
+		if inter != nil {
+			ptx, ok := inter.(*modules.TxPoolTransaction)
+			if ok {
+				if count == 0 {
+					biger.Priority_lvl = ptx.Priority_lvl
+				}
+				if count > 1 {
+					bp, _ := strconv.ParseFloat(biger.Priority_lvl, 64)
+					pp, _ := strconv.ParseFloat(ptx.Priority_lvl, 64)
+					if bp < pp {
+						biger = ptx
+						t.Fatal(fmt.Sprintf("sort.Sort.priorityHeap is failed.biger:  %s ,ptx: %s  , index: %d ", biger.Priority_lvl, ptx.Priority_lvl, ptx.Index))
+					} else {
+						bad = ptx
+					}
+				}
+				count++
+
+			}
+		} else {
+			log.Debug("pop error: the interTx is nil ", "count", count)
+			break
+		}
+	}
+	log.Debug("all pop end. ", "count", count)
+	log.Debug("best priority  tx: ", "info", biger)
+	log.Debug("bad priority  tx: ", "info", bad)
 }

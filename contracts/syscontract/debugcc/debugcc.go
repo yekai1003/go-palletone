@@ -44,8 +44,11 @@ func (d *DebugChainCode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		return d.add(stub, args)
 	case "getbalance":
 		return d.getbalance(stub, args)
+	case "getRequesterCert":
+		return d.getRequesterCert(stub, args)
 	case "ForfeitureDeposit":
-
+	case "getRootCABytes":
+		return d.getRootCABytes(stub, args)
 	default:
 		return shim.Error("Invoke error")
 	}
@@ -66,6 +69,35 @@ func (d *DebugChainCode) getbalance(stub shim.ChaincodeStubInterface, args []str
 	}
 	log.Debugf("GetBalance result:%+v", result)
 	b, e := json.Marshal(result)
+	if e != nil {
+		return shim.Error(e.Error())
+	}
+	return shim.Success(b)
+}
+
+func (d *DebugChainCode) getRequesterCert(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	if len(args) != 1 {
+		reqStr := fmt.Sprintf("Need one args: [requester cert id]")
+		return shim.Error(reqStr)
+	}
+	certBytes, err := stub.GetRequesterCert()
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+
+	b, e := json.Marshal(certBytes)
+	if e != nil {
+		return shim.Error(e.Error())
+	}
+	return shim.Success(b)
+}
+
+func (d *DebugChainCode) getRootCABytes(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	val, err := stub.GetSystemConfig("RootCABytes")
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	b, e := json.Marshal(val)
 	if e != nil {
 		return shim.Error(e.Error())
 	}

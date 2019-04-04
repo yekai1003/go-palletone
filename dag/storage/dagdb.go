@@ -69,9 +69,9 @@ type IDagDb interface {
 
 	//getChainUnit(hash common.Hash) (*modules.Unit, error)
 	GetUnitTransactions(hash common.Hash) (modules.Transactions, error)
-	GetTransaction(hash common.Hash) (*modules.Transaction, common.Hash, uint64, uint64, error)
+	//GetTransaction(hash common.Hash) (*modules.TransactionWithUnitInfo, error)
 	GetTransactionOnly(hash common.Hash) (*modules.Transaction, error)
-	GetTxLookupEntry(hash common.Hash) (common.Hash, uint64, uint64, error)
+	GetTxLookupEntry(hash common.Hash) (*modules.TxLookupEntry, error)
 	GetPrefix(prefix []byte) map[string][]byte
 	GetHeaderByHash(hash common.Hash) (*modules.Header, error)
 	IsHeaderExist(uHash common.Hash) (bool, error)
@@ -88,7 +88,7 @@ type IDagDb interface {
 	//GetHeadFastUnitHash() (common.Hash, error)
 	//GetAllLeafNodes() ([]*modules.Header, error)
 	GetTrieSyncProgress() (uint64, error)
-	//GetLastIrreversibleUnit(assetID modules.IDType16) (*modules.Unit, error)
+	//GetLastIrreversibleUnit(assetID modules.AssetId) (*modules.Unit, error)
 	//GetTokenInfo(key string) (*modules.TokenInfo, error)
 	//GetAllTokenInfo() (*modules.AllTokenInfo, error)
 
@@ -337,6 +337,7 @@ func (dagdb *DagDb) SaveTxLookupEntry(unit *modules.Unit) error {
 			UnitHash:  unit.Hash(),
 			UnitIndex: unit.NumberU64(),
 			Index:     uint64(i),
+			Timestamp: uint64(unit.UnitHeader.Time),
 		}
 		key := append(constants.LookupPrefix, tx.Hash().Bytes()...)
 
@@ -346,15 +347,15 @@ func (dagdb *DagDb) SaveTxLookupEntry(unit *modules.Unit) error {
 	}
 	return batch.Write()
 }
-func (dagdb *DagDb) GetTxLookupEntry(txHash common.Hash) (common.Hash, uint64, uint64, error) {
+func (dagdb *DagDb) GetTxLookupEntry(txHash common.Hash) (*modules.TxLookupEntry, error) {
 	key := append(constants.LookupPrefix, txHash.Bytes()...)
 	entry := &modules.TxLookupEntry{}
 	err := retrieve(dagdb.db, key, entry)
 	if err != nil {
 		log.Info("get entry structure info:", "error", err, "tx_entry", entry)
-		return common.Hash{}, 0, 0, err
+		return nil, err
 	}
-	return entry.UnitHash, entry.UnitIndex, entry.Index, nil
+	return entry, nil
 }
 
 //func (dagdb *DagDb) SaveTokenInfo(token_info *modules.TokenInfo) (*modules.TokenInfo, error) {
@@ -499,7 +500,7 @@ func (dagdb *DagDb) GetUnitTransactions(hash common.Hash) (modules.Transactions,
 //	return dagdb.getChainUnit(h)
 //}
 //
-//func (dagdb *DagDb) GetLastIrreversibleUnit(assetID modules.IDType16) (*modules.Unit, error) {
+//func (dagdb *DagDb) GetLastIrreversibleUnit(assetID modules.AssetId) (*modules.Unit, error) {
 //	key := fmt.Sprintf("%s_%s_1_", constants.UNIT_NUMBER_PREFIX, assetID.String())
 //
 //	data := dagdb.GetPrefix([]byte(key))
@@ -577,132 +578,6 @@ func (dagdb *DagDb) GetHeaderByHash(hash common.Hash) (*modules.Header, error) {
 //		return unit.UnitHeader
 //	}
 //	return nil
-//}
-
-// GetTxLookupEntry return unit's hash ,number
-
-//func ConvertMsg(tx *modules.Transaction) ([]*modules.Message, error) {
-//	if tx == nil {
-//		return nil, errors.New("convert msg tx is nil")
-//	}
-//	msgs := make([]*modules.Message, 0)
-//	for _, msg := range tx.Messages() {
-//		//fmt.Println("msg ", msg)
-//
-//		data1, err1 := json.Marshal(msg.Payload)
-//		if err1 != nil {
-//			return nil, err1
-//		}
-//		switch msg.App {
-//		default:
-//			//case APP_PAYMENT, APP_CONTRACT_TPL, APP_DATA, APP_VOTE:
-//			// payment := new(modules.PaymentPayload)
-//			// err2 := json.Unmarshal(data1, &payment)
-//			// if err2 != nil {
-//			// 	return nil, err2
-//			// }
-//			// msg.Payload = payment
-//			msgs = append(msgs, msg)
-//
-//		case modules.APP_PAYMENT: //0
-//			payment := new(modules.PaymentPayload)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//		case modules.APP_CONTRACT_TPL: //1
-//			payment := new(modules.ContractTplPayload)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//
-//		case modules.APP_CONTRACT_DEPLOY: //2
-//			payment := new(modules.ContractDeployPayload)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//
-//		case modules.APP_CONTRACT_INVOKE: //3
-//			payment := new(modules.ContractInvokePayload)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			// decode WriteSet interface
-//			//for i, cw := range payment.WriteSet {
-//			//	fmt.Println("lal========================ala", i, cw.Value)
-//			//	//fmt.Printf("lalalalala%#v\n\n",cw.Value)
-//			//	val_byte, _ := json.Marshal(cw.Value)
-//			//	var item []byte
-//			//	json.Unmarshal(val_byte, &item)
-//			//	fmt.Println("===========", item)
-//			//	payment.WriteSet[i].Value = item
-//			//
-//			//}
-//
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//		case modules.APP_CONTRACT_INVOKE_REQUEST: //4
-//			payment := new(modules.ContractInvokeRequestPayload)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//		case modules.APP_CONFIG: //5
-//			payment := new(modules.ConfigPayload)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//		case modules.APP_DATA: //6
-//			payment := new(modules.DataPayload)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//		case modules.APP_VOTE: //7
-//			payment := new(vote.VoteInfo)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//		case modules.APP_SIGNATURE: //8
-//			payment := new(modules.SignaturePayload)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//
-//		case modules.OP_MEDIATOR_CREATE:
-//			payment := new(modules.MediatorCreateOperation)
-//			err2 := json.Unmarshal(data1, &payment)
-//			if err2 != nil {
-//				return nil, err2
-//			}
-//			msg.Payload = payment
-//			msgs = append(msgs, msg)
-//
-//		}
-//	}
-//	return msgs, nil
 //}
 
 //func (dagdb *DagDb) GetContractNoReader(db ptndb.Database, id common.Hash) (*modules.Contract, error) {

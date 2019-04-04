@@ -32,6 +32,8 @@ type IStateRepository interface {
 	GetContractState(id []byte, field string) ([]byte, *modules.StateVersion, error)
 	GetConfig(name string) ([]byte, *modules.StateVersion, error)
 	GetContractStatesById(id []byte) (map[string]*modules.ContractStateValue, error)
+	GetContractStatesByPrefix(id []byte, prefix string) (map[string]*modules.ContractStateValue, error)
+
 	GetContract(id []byte) (*modules.Contract, error)
 	GetContractTpl(templateID []byte) (version *modules.StateVersion, bytecode []byte, name string, path string, tplVersion string)
 	GetContractDeploy(tempId, contractId []byte, name string) (*modules.ContractDeployPayload, error)
@@ -47,7 +49,11 @@ type IStateRepository interface {
 	LookupAccount() map[common.Address]*modules.AccountInfo
 	RetrieveMediatorInfo(address common.Address) (*modules.MediatorInfo, error)
 	GetMinFee() (*modules.AmountAsset, error)
-	//GetCurrentChainIndex(assetId modules.IDType16) (*modules.ChainIndex, error)
+	//GetCurrentChainIndex(assetId modules.AssetId) (*modules.ChainIndex, error)
+
+	GetJuryCandidateList() ([]string, error)
+	IsJury(address common.Address) bool
+	UpdateSysParams(ver *modules.StateVersion) error
 }
 
 type StateRepository struct {
@@ -71,6 +77,10 @@ func (rep *StateRepository) GetConfig(name string) ([]byte, *modules.StateVersio
 func (rep *StateRepository) GetContractStatesById(id []byte) (map[string]*modules.ContractStateValue, error) {
 	return rep.statedb.GetContractStatesById(id)
 }
+func (rep *StateRepository) GetContractStatesByPrefix(id []byte, prefix string) (map[string]*modules.ContractStateValue, error) {
+	return rep.statedb.GetContractStatesByPrefix(id, prefix)
+}
+
 func (rep *StateRepository) GetContract(id []byte) (*modules.Contract, error) {
 	return rep.statedb.GetContract(id)
 }
@@ -113,4 +123,16 @@ func (rep *StateRepository) GetContractDeploy(tempId, contractId []byte, name st
 }
 func (rep *StateRepository) GetMinFee() (*modules.AmountAsset, error) {
 	return rep.statedb.GetMinFee()
+}
+
+func (rep *StateRepository) GetJuryCandidateList() ([]string, error) {
+	return rep.statedb.GetJuryCandidateList()
+}
+
+func (rep *StateRepository) IsJury(address common.Address) bool {
+	return rep.statedb.IsInJuryCandidateList(address)
+}
+
+func (rep *StateRepository) UpdateSysParams(ver *modules.StateVersion) error {
+	return rep.statedb.UpdateSysParams(ver)
 }

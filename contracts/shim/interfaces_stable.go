@@ -94,6 +94,7 @@ type ChaincodeStubInterface interface {
 	// consider data modified by PutState that has not been committed.
 	// If the key does not exist in the state database, (nil, nil) is returned.
 	GetState(key string) ([]byte, error)
+	GetStateByPrefix(prefix string) ([]*modules.KeyValue, error)
 
 	// PutState puts the specified `key` and `value` into the transaction's
 	// writeset as a data-write proposal. PutState doesn't effect the ledger
@@ -107,6 +108,9 @@ type ChaincodeStubInterface interface {
 	OutChainAddress(outChainName string, params []byte) ([]byte, error)
 	OutChainTransaction(outChainName string, params []byte) ([]byte, error)
 	OutChainQuery(outChainName string, params []byte) ([]byte, error)
+
+	SendJury(msgType uint32, content []byte) ([]byte, error)
+	RecvJury(msgType uint32, timeout uint32) ([]byte, error)
 
 	// DelState records the specified `key` to be deleted in the writeset of
 	// the transaction proposal. The `key` and its value will be deleted from
@@ -147,6 +151,10 @@ type ChaincodeStubInterface interface {
 	//增发一种之前已经定义好的Token
 	//如果是ERC20增发，则uniqueId为空，如果是ERC721增发，则必须指定唯一的uniqueId
 	SupplyToken(assetId []byte, uniqueId []byte, amt uint64, creator string) error
+
+	// 根据证书ID获得证书字节数据
+	GetRequesterCert() (certBytes []byte, err error)
+
 	// GetStateByRange returns a range iterator over a set of keys in the
 	// ledger. The iterator can be used to iterate over all keys
 	// between the startKey (inclusive) and endKey (exclusive).

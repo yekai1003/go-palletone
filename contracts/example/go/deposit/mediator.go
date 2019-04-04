@@ -108,6 +108,14 @@ func handleForApplyBecomeMediator(stub shim.ChaincodeStubInterface, args []strin
 		log.Error("Stub.GetInvokeAddress err:", "error", err)
 		return shim.Error(err.Error())
 	}
+	foundationAddress, err := stub.GetSystemConfig("FoundationAddress")
+	if err != nil {
+		//fmt.Println(err.Error())
+		log.Error("Stub.GetSystemConfig with FoundationAddress err:", "error", err)
+		return shim.Error(err.Error())
+	}
+	//foundationAddress = "P129MFVxaLP4N9FZxYQJ3QPJks4gCeWsF9p"
+	log.Info("Stub.GetSystemConfig with FoundationAddress:", "value", foundationAddress)
 	if strings.Compare(invokeAddr, foundationAddress) != 0 {
 		log.Error("Please use foundation address.")
 		return shim.Error("Please use foundation address.")
@@ -298,6 +306,14 @@ func handleForApplyQuitMediator(stub shim.ChaincodeStubInterface, args []string)
 		log.Error("Stub.GetInvokeAddress err:", "error", err)
 		return shim.Error(err.Error())
 	}
+	foundationAddress, err := stub.GetSystemConfig("FoundationAddress")
+	if err != nil {
+		//fmt.Println(err.Error())
+		log.Error("Stub.GetSystemConfig with FoundationAddress err:", "error", err)
+		return shim.Error(err.Error())
+	}
+	//foundationAddress = "P129MFVxaLP4N9FZxYQJ3QPJks4gCeWsF9p"
+	log.Info("Stub.GetSystemConfig with FoundationAddress:", "value", foundationAddress)
 	if strings.Compare(invokeAddr, foundationAddress) != 0 {
 		log.Error("Please use foundation address.")
 		return shim.Success([]byte("Please use foundation address."))
@@ -387,7 +403,12 @@ func handleForApplyQuitMediator(stub shim.ChaincodeStubInterface, args []string)
 func deleteNode(stub shim.ChaincodeStubInterface, balance *DepositBalance, nodeAddr string) error {
 	//计算币龄收益
 	endTime := balance.LastModifyTime * 1800
-	awards := award.GetAwardsWithCoins(balance.TotalAmount, endTime)
+	depositRate,err := stub.GetSystemConfig("DepositRate")
+	if err != nil {
+		log.Error("stub.GetSystemConfig err:","error",err)
+		return err
+	}
+	awards := award.GetAwardsWithCoins(balance.TotalAmount, endTime,depositRate)
 	//本金+利息
 	balance.TotalAmount += awards
 	//TODO 是否传入
@@ -396,7 +417,7 @@ func deleteNode(stub shim.ChaincodeStubInterface, balance *DepositBalance, nodeA
 	asset := modules.NewPTNAsset()
 	invokeTokens.Asset = asset
 	//调用从合约把token转到请求地址
-	err := stub.PayOutToken(nodeAddr, invokeTokens, 0)
+	err = stub.PayOutToken(nodeAddr, invokeTokens, 0)
 	if err != nil {
 		log.Error("Stub.PayOutToken err:", "error", err)
 		return err
@@ -429,6 +450,18 @@ func deleteNode(stub shim.ChaincodeStubInterface, balance *DepositBalance, nodeA
 
 //mediator 交付保证金：
 func mediatorPayToDepositContract(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	depositAmountsForMediatorStr, err := stub.GetSystemConfig("DepositAmountForMediator")
+	if err != nil {
+		log.Error("Stub.GetSystemConfig with DepositAmountForMediator err:", "error", err)
+		return shim.Error(err.Error())
+	}
+	//转换
+	depositAmountsForMediator, err := strconv.ParseUint(depositAmountsForMediatorStr, 10, 64)
+	if err != nil {
+		log.Error("Strconv.ParseUint err:", "error", err)
+		return shim.Error(err.Error())
+	}
+	log.Info("Stub.GetSystemConfig with DepositAmountForMediator:", "value", depositAmountsForMediator)
 	log.Info("Starting entering mediatorPayToDepositContract func.")
 	//交付地址
 	invokeAddr, err := stub.GetInvokeAddress()
@@ -500,7 +533,12 @@ func mediatorPayToDepositContract(stub shim.ChaincodeStubInterface, args []strin
 	} else {
 		//TODO 再次交付保证金时，先计算当前余额的币龄奖励
 		endTime := balance.LastModifyTime * 1800
-		awards := award.GetAwardsWithCoins(balance.TotalAmount, endTime)
+		depositRate,err := stub.GetSystemConfig("DepositRate")
+		if err != nil {
+			log.Error("stub.GetSystemConfig err:","error",err)
+			return shim.Error(err.Error())
+		}
+		awards := award.GetAwardsWithCoins(balance.TotalAmount, endTime,depositRate)
 		balance.TotalAmount += awards
 		//处理数据
 		updateForPayValue(balance, invokeTokens)
@@ -567,6 +605,14 @@ func handleForMediatorApplyCashback(stub shim.ChaincodeStubInterface, args []str
 		return shim.Error(err.Error())
 	}
 	//判断没收请求地址是否是基金会地址
+	foundationAddress, err := stub.GetSystemConfig("FoundationAddress")
+	if err != nil {
+		//fmt.Println(err.Error())
+		log.Error("Stub.GetSystemConfig with FoundationAddress err:", "error", err)
+		return shim.Error(err.Error())
+	}
+	//foundationAddress = "P129MFVxaLP4N9FZxYQJ3QPJks4gCeWsF9p"
+	log.Info("Stub.GetSystemConfig with FoundationAddress:", "value", foundationAddress)
 	if strings.Compare(invokeAddr, foundationAddress) != 0 {
 		log.Error("Please use foundation address.")
 		return shim.Error("Please use foundation address.")
@@ -614,6 +660,29 @@ func handleForMediatorApplyCashback(stub shim.ChaincodeStubInterface, args []str
 }
 
 func handleMediator(stub shim.ChaincodeStubInterface, cashbackAddr string, applyTime int64, balance *DepositBalance) error {
+	depositPeriod, err := stub.GetSystemConfig("DepositPeriod")
+	if err != nil {
+		log.Error("Stub.GetSystemConfig with DepositPeriod err:", "error", err)
+		return err
+	}
+	day, err := strconv.Atoi(depositPeriod)
+	if err != nil {
+		log.Error("Strconv.Atoi err:", "error", err)
+		return err
+	}
+	log.Info("Stub.GetSystemConfig with DepositPeriod:", "value", day)
+	depositAmountsForMediatorStr, err := stub.GetSystemConfig("DepositAmountForMediator")
+	if err != nil {
+		log.Error("Stub.GetSystemConfig with DepositAmountForMediator err:", "error", err)
+		return err
+	}
+	//转换
+	depositAmountsForMediator, err := strconv.ParseUint(depositAmountsForMediatorStr, 10, 64)
+	if err != nil {
+		log.Error("Strconv.ParseUint err:", "error", err)
+		return err
+	}
+	log.Info("Stub.GetSystemConfig with DepositAmountForMediator:", "value", depositAmountsForMediator)
 	//获取提取列表
 	listForCashback, err := GetListForCashback(stub)
 	if err != nil {
@@ -664,7 +733,7 @@ func handleMediator(stub shim.ChaincodeStubInterface, cashbackAddr string, apply
 		//当前时间
 		endTime := time.Now().UTC().YearDay()
 		//判断是否已超过规定周期
-		if endTime-startTime >= depositPeriod {
+		if endTime-startTime >= day {
 			//退出全部，即删除cashback
 			err = deleteNode(stub, balance, cashbackAddr)
 			if err != nil {

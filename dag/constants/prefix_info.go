@@ -59,6 +59,7 @@ var (
 	MEDIATOR_SCHEME_PREFIX        = []byte("ms")
 	ACCOUNT_INFO_PREFIX           = []byte("ai")
 	ACCOUNT_PTN_BALANCE_PREFIX    = []byte("ab")
+	TokenTxHash_Prefix            = []byte("tt")
 	// lookup
 	LookupPrefix = []byte("l")
 
@@ -102,4 +103,15 @@ var (
 // suffix
 var (
 	NumberSuffix = []byte("n")
+)
+
+// symbols
+var (
+	CERT_SPLIT_CH = string("||")
+	// certificate
+	CERT_ISSUER_SYMBOL = "certissuer_"
+	CERT_SERVER_SYMBOL = "certserver_"
+	CERT_MEMBER_SYMBOL = "certmember_"
+	CERT_BYTES_SYMBOL  = "certbytes_"
+	CRL_BYTES_SYMBOL   = "crlbytes_"
 )

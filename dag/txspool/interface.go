@@ -52,10 +52,9 @@ type ITxPool interface {
 	// TxPreEvent and send events to the given channel.
 	SubscribeTxPreEvent(chan<- modules.TxPreEvent) event.Subscription
 	GetSortedTxs(hash common.Hash) ([]*modules.TxPoolTransaction, common.StorageSize)
-	GetNonce(hash common.Hash) uint64
 	Get(hash common.Hash) (*modules.TxPoolTransaction, common.Hash)
 	GetPoolTxsByAddr(addr string) ([]*modules.TxPoolTransaction, error)
-	Stats() (int, int)
+	Stats() (int, int, int)
 	Content() (map[common.Hash]*modules.Transaction, map[common.Hash]*modules.Transaction)
 	GetTxFee(tx *modules.Transaction) (*modules.AmountAsset, error)
 	OutPointIsSpend(outPoint *modules.OutPoint) (bool, error)

@@ -96,24 +96,23 @@ func TestSaveUnit(t *testing.T) {
 
 	p := common.Hash{}
 	p.SetString("0000000000000000000000000000000")
-	aid := modules.IDType16{}
+	aid := modules.AssetId{}
 	aid.SetBytes([]byte("xxxxxxxxxxxxxxxxxx"))
 	header := new(modules.Header)
 	header.ParentsHash = append(header.ParentsHash, p)
 	header.Number = &modules.ChainIndex{AssetID: modules.PTNCOIN, Index: 0}
-	//header.AssetIDs = []modules.IDType16{aid}
+	//header.AssetIDs = []modules.AssetId{aid}
 	key, _ := crypto.GenerateKey()
-	addr0 := crypto.PubkeyToAddress(&key.PublicKey)
+	//addr0 := crypto.PubkeyToAddress(&key.PublicKey)
 
 	sig, err := crypto.Sign(header.Hash().Bytes(), key)
 	if err != nil {
 		log.Println("sign header occured error: ", err)
 	}
 	auth := new(modules.Authentifier)
-	auth.R = sig[:32]
-	auth.S = sig[32:64]
-	auth.V = sig[64:]
-	auth.Address = addr0
+	auth.Signature = sig
+	auth.PubKey = crypto.CompressPubkey(&key.PublicKey)
+
 	header.Authors = *auth
 	contractTplPayload := modules.NewContractTplPayload([]byte("contract_template0000"),
 		"TestContractTpl", "./contract", "1.1.1", 1024,
@@ -277,9 +276,10 @@ func TestRlpDecode(t *testing.T) {
 func TestPaymentTransactionRLP(t *testing.T) {
 	p := common.Hash{}
 	p.SetString("0000000000000000022222222222")
-	aid := modules.IDType16{}
+	aid := modules.AssetId{}
 	aid.SetBytes([]byte("xxxxxxxxxxxxxxxxxx"))
-
+	uid := modules.UniqueId{}
+	uid.SetBytes([]byte{0xff, 0xee})
 	// TODO test PaymentPayload
 	txin := modules.Input{
 		PreviousOutPoint: &modules.OutPoint{
@@ -295,7 +295,7 @@ func TestPaymentTransactionRLP(t *testing.T) {
 		PkScript: []byte("kssssssssssssssssssslsll"),
 		Asset: &modules.Asset{
 			AssetId:  aid,
-			UniqueId: aid,
+			UniqueId: uid,
 		},
 	}
 	payment := &modules.PaymentPayload{

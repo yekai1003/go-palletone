@@ -20,9 +20,9 @@
 package dag
 
 import (
-	"sort"
-
 	"github.com/palletone/go-palletone/common"
+	"github.com/palletone/go-palletone/common/log"
+	csort "github.com/palletone/go-palletone/core/sort"
 	"github.com/palletone/go-palletone/dag/modules"
 )
 
@@ -70,6 +70,9 @@ func (dag *Dag) performAccountMaintenance() {
 	dag.mediatorVoteTally = make([]*voteTally, mediatorCount, mediatorCount)
 	mediatorIndex := make(map[common.Address]int, mediatorCount)
 
+	maxMediatorCount := dag.GetChainParameters().MaximumMediatorCount
+	dag.mediatorCountHistogram = make([]uint64, maxMediatorCount/2+1)
+
 	index := 0
 	for mediator, _ := range mediators {
 		// 建立 mediator 地址和index 的映射关系
@@ -80,6 +83,13 @@ func (dag *Dag) performAccountMaintenance() {
 		dag.mediatorVoteTally[index] = voteTally
 
 		index++
+	}
+
+	minFn := func(x, y int) int {
+		if x < y {
+			return x
+		}
+		return y
 	}
 
 	// 2. 遍历所有账户
@@ -100,27 +110,76 @@ func (dag *Dag) performAccountMaintenance() {
 			dag.mediatorVoteTally[index].votedCount += votingStake
 		}
 
+		// 统计该账户设置的活跃mediator数量
+		desiredMediatorCount := info.DesiredMediatorCount
+		if desiredMediatorCount <= maxMediatorCount {
+			offset := minFn(int(desiredMediatorCount/2), len(dag.mediatorCountHistogram)-1)
+
+			// votes for a number greater than MaximumMediatorCount
+			// are turned into votes for MaximumMediatorCount.
+			//
+			// in particular, this takes care of the case where a
+			// member was voting for a high number, then the
+			// parameter was lowered.
+			dag.mediatorCountHistogram[offset] += votingStake
+		}
+
 		dag.totalVotingStake += votingStake
 	}
 }
 
 func (dag *Dag) updateActiveMediators() bool {
-	// todo 统计出active mediator个数的投票数量，并得出结论
+	// 1. 统计出活跃mediator数量n
+	stakeTarget := (dag.totalVotingStake - dag.mediatorCountHistogram[0]) / 2
+
+	// accounts that vote for 0 or 1 mediator do not get to express an opinion on
+	// the number of mediators to have (they abstain and are non-voting accounts)
+
+	mediatorCountIndex := 0
+	if stakeTarget > 0 {
+		var stakeTally uint64 = 0
+		upperLimit := len(dag.mediatorCountHistogram) - 1
+		for mediatorCountIndex < upperLimit {
+			mediatorCountIndex++
+			stakeTally += dag.mediatorCountHistogram[mediatorCountIndex]
+
+			if stakeTally > stakeTarget {
+				break
+			}
+		}
+	}
+
+	maxFn := func(x, y int) int {
+		if x > y {
+			return x
+		}
+		return y
+	}
+
 	gp := dag.GetGlobalProp()
-	mediatorCount := len(gp.ActiveMediators)
+	minMediatorCount := gp.ImmutableParameters.MinimumMediatorCount
+	mediatorCount := maxFn(mediatorCountIndex*2+1, int(minMediatorCount))
 
-	// 根据每个mediator的得票数，排序出前n个 active mediator
-	// todo 应当优化本排序方法，使用部分排序的方法
-	sort.Sort(dag.mediatorVoteTally)
+	mediatorLen := dag.mediatorVoteTally.Len()
+	if mediatorLen < mediatorCount {
+		log.Debugf("the desired mediator count is %v, the actual mediator count is %v,"+
+			" the minimum mediator count is %v", mediatorCount, mediatorLen, minMediatorCount)
+		// 保证活跃mediator的总数为奇数
+		mediatorCount = (mediatorLen-1)/2*2 + 1
+	}
+	log.Debugf("In this round, The active mediator's count is %v", mediatorCount)
 
-	// 更新每个mediator的得票数
+	// 2. 根据每个mediator的得票数，排序出前n个 active mediator
+	csort.PartialSort(dag.mediatorVoteTally, mediatorCount)
+
+	// 3. 更新每个mediator的得票数
 	for _, voteTally := range dag.mediatorVoteTally {
 		med := dag.GetMediator(voteTally.candidate)
 		med.TotalVotes = voteTally.votedCount
 		dag.SaveMediator(med, false)
 	}
 
-	// 更新 global property 中的 active mediator 和 Preceding Mediators
+	// 4. 更新 global property 中的 active mediator 和 Preceding Mediators
 	gp.PrecedingMediators = gp.ActiveMediators
 	gp.ActiveMediators = make(map[common.Address]bool, mediatorCount)
 	for index := 0; index < mediatorCount; index++ {

@@ -20,184 +20,173 @@
 package txspool
 
 import (
-	"container/heap"
-	"math/big"
+	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/dag/modules"
 )
 
-// priceHeap is a heap.Interface implementation over transactions for retrieving
-// price-sorted transactions to discard when the pool fills up.
-type priceHeap []*modules.TxPoolTransaction
-
-func (h priceHeap) Len() int           { return len(h) }
-func (h priceHeap) Less(i, j int) bool { return h[i].GetTxFee().Cmp(h[j].GetTxFee()) < 0 }
-func (h priceHeap) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
-	h[i].Index, h[j].Index = i, j
-}
-
-func (h *priceHeap) Push(x interface{}) {
-	n := len(*h)
-	item := x.(*modules.TxPoolTransaction)
-	item.Index = n
-	*h = append(*h, item)
-}
-
-// -1 标识该数据已经出了优先级队列了
-func (h *priceHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
-	x.Index = -1
-	return x
-}
-
-func (h *priceHeap) Update(item *modules.TxPoolTransaction, priority float64) {
-	lvl := strconv.FormatFloat(priority, 'E', -1, 64)
-	item.Priority_lvl = lvl
-	heap.Fix(h, item.Index)
-}
-
 type priorityHeap []*modules.TxPoolTransaction
 
-func (h priorityHeap) Len() int           { return len(h) }
-func (h priorityHeap) Less(i, j int) bool { return h[i].Priority_lvl > h[j].Priority_lvl }
+func (h priorityHeap) Len() int { return len(h) }
+func (h priorityHeap) Less(i, j int) bool {
+	ap, _ := strconv.ParseFloat(h[i].Priority_lvl, 64)
+	bp, _ := strconv.ParseFloat(h[j].Priority_lvl, 64)
+	return ap > bp
+}
 func (h priorityHeap) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
-	//h[i].Index, h[j].Index = i, j
 }
 
 func (h *priorityHeap) Push(x interface{}) {
-	n := len(*h)
 	item := x.(*modules.TxPoolTransaction)
-	item.Index = n
 	*h = append(*h, item)
+	sort.Sort(*h)
 }
 
-// -1 标识该数据已经出了优先级队列了 ,弹出优先级最高的
-func (h *priorityHeap) Pop() interface{} {
-	//old := *h
-	//n := len(old)
-	//x := old[0]
-	//*h = old[1:n]
-	//x.Index = -1
-	//return x
+func (h *priorityHeap) LastPop() interface{} {
 	old := *h
 	n := len(old)
+	if n <= 0 {
+		return nil
+	}
 	x := old[n-1]
 	*h = old[0 : n-1]
-	x.Index = -1
 	return x
 }
-
-func (h *priorityHeap) Update(item *modules.TxPoolTransaction, priority float64) {
-	lvl := strconv.FormatFloat(priority, 'E', -1, 64)
-	item.Priority_lvl = lvl
-	heap.Fix(h, item.Index)
+func (h *priorityHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	if n <= 0 {
+		return nil
+	}
+	x := old[0]
+	*h = old[1:]
+	return x
 }
 
 // txPricedList is a price-sorted heap to allow operating on transactions pool
 // contents in a price-incrementing way.
-type txPricedList struct {
-	all    *map[common.Hash]*modules.TxPoolTransaction // Pointer to the map of all transactions
-	items  *priorityHeap                               // Heap of prices of all the stored transactions
-	stales int                                         // Number of stale price points to (re-heap trigger)
+type txPrioritiedList struct {
+	all    *sync.Map     // Pointer to the map of all transactions
+	items  *priorityHeap // Heap of priority of all the stored transactions
+	stales int           // Number of stale priority points to (re-heap trigger)
+	mu     sync.RWMutex
 }
 
 // newTxPricedList creates a new price-sorted transaction heap.
-func newTxPricedList(all *map[common.Hash]*modules.TxPoolTransaction) *txPricedList {
-	return &txPricedList{
+func newTxPrioritiedList(all *sync.Map) *txPrioritiedList {
+	return &txPrioritiedList{
 		all:   all,
 		items: new(priorityHeap),
 	}
 }
 
 // Put inserts a new transaction into the heap.
-func (l *txPricedList) Put(tx *modules.TxPoolTransaction) *priorityHeap {
-	heap.Push(l.items, tx)
-	(*l.all)[tx.Tx.Hash()] = tx
-	//sort.Sort(l.items)
-	return l.items
+func (l *txPrioritiedList) Put(tx *modules.TxPoolTransaction) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.items.Push(tx)
+	//heap.Push(l.items, tx)
 }
-func (l *txPricedList) Get() *modules.TxPoolTransaction {
-	if l != nil {
-		if l.items.Len() > 0 {
-			tx, ok := heap.Pop(l.items).(*modules.TxPoolTransaction)
-			if ok {
-				if tx.Tx != nil {
-					return tx
-				}
-			}
+func (l *txPrioritiedList) Get() *modules.TxPoolTransaction {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	for len(*l.items) > 0 {
+		tx := l.items.Pop().(*modules.TxPoolTransaction)
+		//tx := heap.Pop(l.items).(*modules.TxPoolTransaction)
+		if _, ok := (*l.all).Load(tx.Tx.Hash()); !ok {
+			continue
 		}
+		if tx.Pending || tx.Discarded {
+			continue
+		}
+		return tx
 	}
 	return nil
+}
+func (l *txPrioritiedList) All() map[common.Hash]*modules.TxPoolTransaction {
+	txs := make(map[common.Hash]*modules.TxPoolTransaction)
+	(*l.all).Range(func(k, v interface{}) bool {
+		var hash common.Hash
+		hash.SetBytes((k.(common.Hash)).Bytes())
+		tx := v.(*modules.TxPoolTransaction)
+		txs[hash] = tx
+		return true
+	})
+	return txs
 }
 
 // Removed notifies the prices transaction list that an old transaction dropped
 // from the pool. The list will just keep a counter of stale objects and update
 // the heap if a large enough ratio of transactions go stale.
-func (l *txPricedList) Removed(hash common.Hash) {
-	//// Bump the stale counter, but exit if still too low (< 25%)
-	//l.stales++
-	//if l.stales <= len(*l.items)/4 {
-	//	return
-	//}
+func (l *txPrioritiedList) Removed() {
+	// Bump the stale counter, but exit if still too low (< 20%)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.stales++
+	if l.stales <= len(*l.items)/5 {
+		return
+	}
 	// Seems we've reached a critical number of stale transactions, reheap
-	reheap := make(priorityHeap, 0, len(*l.all))
+	reheap := make(priorityHeap, 0)
 
 	l.stales, l.items = 0, &reheap
-
-	for key, tx := range *l.all {
-		if hash != key {
+	all := l.All()
+	for _, tx := range all {
+		if !tx.Pending && !tx.Discarded {
 			*l.items = append(*l.items, tx)
-		} else {
-			l.stales--
 		}
 	}
-	heap.Init(l.items)
+	sort.Sort(*l.items)
+	//heap.Init(l.items)
 }
 
-// Cap finds all the transactions below the given price threshold, drops them
-// from the priced list and returs them for further removal from the entire pool.
-func (l *txPricedList) Cap(threshold *big.Int) modules.TxPoolTxs {
-	drop := make(modules.TxPoolTxs, 0, 128) // Remote underpriced transactions to drop
-	save := make(modules.TxPoolTxs, 0, 64)  // Local underpriced transactions to keep
-
+func (l *txPrioritiedList) Cap(threshold float64) []*modules.TxPoolTransaction {
+	save := make([]*modules.TxPoolTransaction, 0)
+	drop := make([]*modules.TxPoolTransaction, 0)
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for len(*l.items) > 0 {
-		// Discard stale transactions if found during cleanup
-		tx := heap.Pop(l.items).(*modules.TxPoolTransaction)
-		if _, ok := (*l.all)[tx.Tx.Hash()]; !ok {
+		tx := l.items.Pop().(*modules.TxPoolTransaction)
+		//tx := heap.Pop(l.items).(*modules.TxPoolTransaction)
+		if _, has := (*l.all).Load(tx.Tx.Hash()); !has {
 			l.stales--
 			continue
 		}
-		// Stop the discards if we've reached the threshold
-		if tx.GetTxFee().Cmp(threshold) >= 0 {
+		priority, _ := strconv.ParseFloat(tx.Priority_lvl, 64)
+		if priority > threshold {
 			save = append(save, tx)
 			break
 		}
-
+		drop = append(drop, tx)
 	}
 	for _, tx := range save {
-		heap.Push(l.items, tx)
+		l.items.Push(tx)
+		//heap.Push(l.items, tx)
 	}
 	return drop
 }
 
 // Underpriced checks whether a transaction is cheaper than (or as cheap as) the
 // lowest priced transaction currently being tracked.
-func (l *txPricedList) Underpriced(tx *modules.TxPoolTransaction) bool {
-
+func (l *txPrioritiedList) Underpriced(tx *modules.TxPoolTransaction) bool {
+	all := l.All()
+	if _, has := all[tx.Tx.Hash()]; has {
+		return false
+	}
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	// Discard stale price points if found at the heap start
 	for len(*l.items) > 0 {
 		head := []*modules.TxPoolTransaction(*l.items)[0]
-		if _, ok := (*l.all)[head.Tx.Hash()]; !ok {
+		if _, ok := (*l.all).Load(head.Tx.Hash()); !ok {
 			l.stales--
-			heap.Pop(l.items)
+			l.items.Pop()
+			//heap.Pop(l.items)
 			continue
 		}
 		break
@@ -208,26 +197,28 @@ func (l *txPricedList) Underpriced(tx *modules.TxPoolTransaction) bool {
 		return false
 	}
 	cheapest := []*modules.TxPoolTransaction(*l.items)[0]
-	return cheapest.Priority_lvl >= tx.Priority_lvl
+	cp, _ := strconv.ParseFloat(cheapest.Priority_lvl, 64)
+	tp, _ := strconv.ParseFloat(tx.Priority_lvl, 64)
+	return cp >= tp
 }
 
 // Discard finds a number of most underpriced transactions, removes them from the
 // priced list and returns them for further removal from the entire pool.
-func (l *txPricedList) Discard(count int) modules.TxPoolTxs {
+func (l *txPrioritiedList) Discard(count int) modules.TxPoolTxs {
 	drop := make(modules.TxPoolTxs, 0, count) // Remote underpriced transactions to drop
-	save := make(modules.TxPoolTxs, 0, 64)    // Local underpriced transactions to keep
-
+	all := l.All()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	for len(*l.items) > 0 && count > 0 {
 		// Discard stale transactions if found during cleanup
-		tx := heap.Pop(l.items).(*modules.TxPoolTransaction)
-		if _, ok := (*l.all)[tx.Tx.Hash()]; !ok {
+		tx := l.items.Pop().(*modules.TxPoolTransaction)
+		//tx := heap.Pop(l.items).(*modules.TxPoolTransaction)
+		if _, ok := all[tx.Tx.Hash()]; !ok {
 			l.stales--
 			continue
 		}
-
-	}
-	for _, tx := range save {
-		heap.Push(l.items, tx)
+		drop = append(drop, tx)
+		count--
 	}
 	return drop
 }
