@@ -115,7 +115,7 @@ func TestGetDefault(t *testing.T) {
 }
 
 func TestGetBCCSP(t *testing.T) {
-	bccsp, err := GetBCCSP("SW")
+	bccsp, err := GetBCCSP("GM")
 	assert.NoError(t, err)
 	assert.NotNil(t, bccsp)
 
