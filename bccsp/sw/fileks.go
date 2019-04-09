@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rsa"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -28,6 +27,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/btcsuite/btcutil/base58"
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/palletone/go-palletone/common/log"
@@ -117,12 +117,12 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		return nil, errors.New("Invalid SKI. Cannot be of zero length.")
 	}
 
-	suffix := ks.getSuffix(hex.EncodeToString(ski))
+	suffix := ks.getSuffix(ski2Address(ski))
 
 	switch suffix {
 	case "key":
 		// Load the key
-		key, err := ks.loadKey(hex.EncodeToString(ski))
+		key, err := ks.loadKey(ski2Address(ski))
 		if err != nil {
 			return nil, fmt.Errorf("Failed loading key [%x] [%s]", ski, err)
 		}
@@ -130,7 +130,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		return &aesPrivateKey{key, false}, nil
 	case "sk":
 		// Load the private key
-		key, err := ks.loadPrivateKey(hex.EncodeToString(ski))
+		key, err := ks.loadPrivateKey(ski2Address(ski))
 		if err != nil {
 			return nil, fmt.Errorf("Failed loading secret key [%x] [%s]", ski, err)
 		}
@@ -145,7 +145,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		}
 	case "pk":
 		// Load the public key
-		key, err := ks.loadPublicKey(hex.EncodeToString(ski))
+		key, err := ks.loadPublicKey(ski2Address(ski))
 		if err != nil {
 			return nil, fmt.Errorf("Failed loading public key [%x] [%s]", ski, err)
 		}
@@ -177,7 +177,7 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 	case *ecdsaPrivateKey:
 		kk := k.(*ecdsaPrivateKey)
 
-		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.privKey)
+		err = ks.storePrivateKey(ski2Address(k.SKI()), kk.privKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing ECDSA private key [%s]", err)
 		}
@@ -185,7 +185,7 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 	case *ecdsaPublicKey:
 		kk := k.(*ecdsaPublicKey)
 
-		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.pubKey)
+		err = ks.storePublicKey(ski2Address(k.SKI()), kk.pubKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing ECDSA public key [%s]", err)
 		}
@@ -193,7 +193,7 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 	case *rsaPrivateKey:
 		kk := k.(*rsaPrivateKey)
 
-		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.privKey)
+		err = ks.storePrivateKey(ski2Address(k.SKI()), kk.privKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing RSA private key [%s]", err)
 		}
@@ -201,7 +201,7 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 	case *rsaPublicKey:
 		kk := k.(*rsaPublicKey)
 
-		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.pubKey)
+		err = ks.storePublicKey(ski2Address(k.SKI()), kk.pubKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing RSA public key [%s]", err)
 		}
@@ -209,7 +209,7 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 	case *aesPrivateKey:
 		kk := k.(*aesPrivateKey)
 
-		err = ks.storeKey(hex.EncodeToString(k.SKI()), kk.privKey)
+		err = ks.storeKey(ski2Address(k.SKI()), kk.privKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing AES key [%s]", err)
 		}
@@ -220,7 +220,9 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 
 	return
 }
-
+func ski2Address(ski []byte) string {
+	return "P" + base58.CheckEncode(ski[0:20], byte(0))
+}
 func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err error) {
 
 	files, _ := ioutil.ReadDir(ks.path)
@@ -258,7 +260,7 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 
 		return k, nil
 	}
-	return nil, fmt.Errorf("Key with SKI %s not found in %s", hex.EncodeToString(ski), ks.path)
+	return nil, fmt.Errorf("Key with SKI %s not found in %s", ski2Address(ski), ks.path)
 }
 
 func (ks *fileBasedKeyStore) getSuffix(alias string) string {

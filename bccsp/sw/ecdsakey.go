@@ -17,13 +17,13 @@ package sw
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/sha256"
-	"crypto/x509"
+
 	"errors"
-	"fmt"
 
 	"github.com/palletone/go-palletone/bccsp"
+	"github.com/palletone/go-palletone/bccsp/utils"
+
+	"math/big"
 )
 
 type ecdsaPrivateKey struct {
@@ -41,14 +41,15 @@ func (k *ecdsaPrivateKey) SKI() []byte {
 	if k.privKey == nil {
 		return nil
 	}
-
+	pubKey, _ := k.PublicKey()
+	return pubKey.SKI()
 	// Marshall the public key
-	raw := elliptic.Marshal(k.privKey.Curve, k.privKey.PublicKey.X, k.privKey.PublicKey.Y)
-
-	// Hash it
-	hash := sha256.New()
-	hash.Write(raw)
-	return hash.Sum(nil)
+	//raw := elliptic.Marshal(k.privKey.Curve, k.privKey.PublicKey.X, k.privKey.PublicKey.Y)
+	//
+	//// Hash it
+	//hash := sha256.New()
+	//hash.Write(raw)
+	//return hash.Sum(nil)
 }
 
 // Symmetric returns true if this key is a symmetric key,
@@ -76,11 +77,32 @@ type ecdsaPublicKey struct {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *ecdsaPublicKey) Bytes() (raw []byte, err error) {
-	raw, err = x509.MarshalPKIXPublicKey(k.pubKey)
-	if err != nil {
-		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
+	//raw, err = x509.MarshalPKIXPublicKey(k.pubKey)
+	//if err != nil {
+	//	return nil, fmt.Errorf("Failed marshalling key [%s]", err)
+	//}
+	return SerializeCompressed(k), nil
+}
+
+// SerializeCompressed serializes a public key in a 33-byte compressed format.
+func SerializeCompressed(k *ecdsaPublicKey) []byte {
+	b := make([]byte, 0, 33)
+	p := k.pubKey
+	format := byte(0x2)
+	if isOdd(p.Y) {
+		format |= 0x1
 	}
-	return
+	b = append(b, format)
+	return paddedAppend(32, b, p.X.Bytes())
+}
+func isOdd(a *big.Int) bool {
+	return a.Bit(0) == 1
+}
+func paddedAppend(size uint, dst, src []byte) []byte {
+	for i := 0; i < int(size)-len(src); i++ {
+		dst = append(dst, 0)
+	}
+	return append(dst, src...)
 }
 
 // SKI returns the subject key identifier of this key.
@@ -90,12 +112,14 @@ func (k *ecdsaPublicKey) SKI() []byte {
 	}
 
 	// Marshall the public key
-	raw := elliptic.Marshal(k.pubKey.Curve, k.pubKey.X, k.pubKey.Y)
-
-	// Hash it
-	hash := sha256.New()
-	hash.Write(raw)
-	return hash.Sum(nil)
+	//raw := elliptic.Marshal(k.pubKey.Curve, k.pubKey.X, k.pubKey.Y)
+	//
+	//// Hash it
+	//hash := sha256.New()
+	//hash.Write(raw)
+	//return hash.Sum(nil)
+	pubKeyBytes, _ := k.Bytes()
+	return utils.Hash160(pubKeyBytes)
 }
 
 // Symmetric returns true if this key is a symmetric key,

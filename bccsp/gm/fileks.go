@@ -17,7 +17,7 @@ package gm
 
 import (
 	"bytes"
-	"encoding/hex"
+
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/btcsuite/btcutil/base58"
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/palletone/go-palletone/common/log"
@@ -115,12 +116,12 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (k bccsp.Key, err error) {
 		return nil, errors.New("Invalid SKI. Cannot be of zero length.")
 	}
 
-	suffix := ks.getSuffix(hex.EncodeToString(ski))
+	suffix := ks.getSuffix(ski2Address(ski))
 
 	switch suffix {
 	case "key":
 		// Load the key
-		key, err := ks.loadKey(hex.EncodeToString(ski))
+		key, err := ks.loadKey(ski2Address(ski))
 		if err != nil {
 			return nil, fmt.Errorf("Failed loading key [%x] [%s]", ski, err)
 		}
@@ -128,7 +129,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (k bccsp.Key, err error) {
 		return &gmsm4PrivateKey{key, false}, nil
 	case "sk":
 		// Load the private key
-		key, err := ks.loadPrivateKey(hex.EncodeToString(ski))
+		key, err := ks.loadPrivateKey(ski2Address(ski))
 		if err != nil {
 			return nil, fmt.Errorf("Failed loading secret key [%x] [%s]", ski, err)
 		}
@@ -141,7 +142,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (k bccsp.Key, err error) {
 		}
 	case "pk":
 		// Load the public key
-		key, err := ks.loadPublicKey(hex.EncodeToString(ski))
+		key, err := ks.loadPublicKey(ski2Address(ski))
 		if err != nil {
 			return nil, fmt.Errorf("Failed loading public key [%x] [%s]", ski, err)
 		}
@@ -171,7 +172,7 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 	case *gmsm2PrivateKey:
 		kk := k.(*gmsm2PrivateKey)
 
-		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.privKey)
+		err = ks.storePrivateKey(ski2Address(k.SKI()), kk.privKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing GMSM2 private key [%s]", err)
 		}
@@ -179,16 +180,16 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 	case *gmsm2PublicKey:
 		kk := k.(*gmsm2PublicKey)
 
-		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.pubKey)
+		err = ks.storePublicKey(ski2Address(k.SKI()), kk.pubKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing GMSM2 public key [%s]", err)
 		}
 	case *gmsm4PrivateKey:
 		kk := k.(*gmsm4PrivateKey)
 
-		// keypath := ks.getPathForAlias(hex.EncodeToString(k.SKI()), "key")
+		// keypath := ks.getPathForAlias(ski2Address(k.SKI()), "key")
 
-		err = ks.storeKey(hex.EncodeToString(k.SKI()), kk.privKey)
+		err = ks.storeKey(ski2Address(k.SKI()), kk.privKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing GMSM4 key [%s]", err)
 		}
@@ -198,7 +199,9 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 
 	return
 }
-
+func ski2Address(ski []byte) string {
+	return "P" + base58.CheckEncode(ski[0:20], byte(0))
+}
 func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err error) {
 
 	files, _ := ioutil.ReadDir(ks.path)

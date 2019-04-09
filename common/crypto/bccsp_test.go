@@ -4,7 +4,7 @@ import (
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/factory"
 	"github.com/stretchr/testify/assert"
-	"os"
+	//"os"
 	"testing"
 )
 
@@ -15,7 +15,7 @@ func TestSWFactoryGet(t *testing.T) {
 		SwOpts: &factory.SwOpts{
 			SecLevel:     256,
 			HashFamily:   "SHA3",
-			FileKeystore: &factory.FileKeystoreOpts{KeyStorePath: os.TempDir()},
+			FileKeystore: &factory.FileKeystoreOpts{KeyStorePath: "D:\\Temp"},
 		},
 	}
 
@@ -53,7 +53,7 @@ func TestGmFactoryGet(t *testing.T) {
 		SwOpts: &factory.SwOpts{
 			SecLevel:     256,
 			HashFamily:   "GMSM3",
-			FileKeystore: &factory.FileKeystoreOpts{KeyStorePath: os.TempDir()},
+			FileKeystore: &factory.FileKeystoreOpts{KeyStorePath: "D:\\Temp"},
 		},
 	}
 

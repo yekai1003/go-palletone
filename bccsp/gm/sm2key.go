@@ -16,13 +16,12 @@ limitations under the License.
 package gm
 
 import (
-	"crypto/elliptic"
-	"crypto/sha256"
 	"errors"
-	"fmt"
 
 	"github.com/palletone/go-palletone/bccsp"
+	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/tjfoc/gmsm/sm2"
+	"math/big"
 )
 
 type gmsm2PrivateKey struct {
@@ -40,14 +39,15 @@ func (k *gmsm2PrivateKey) SKI() (ski []byte) {
 	if k.privKey == nil {
 		return nil
 	}
-
+	pub, _ := k.PublicKey()
+	return pub.SKI()
 	//Marshall the public key
-	raw := elliptic.Marshal(k.privKey.Curve, k.privKey.PublicKey.X, k.privKey.PublicKey.Y)
-
-	// Hash it
-	hash := sha256.New()
-	hash.Write(raw)
-	return hash.Sum(nil)
+	//raw := elliptic.Marshal(k.privKey.Curve, k.privKey.PublicKey.X, k.privKey.PublicKey.Y)
+	//
+	//// Hash it
+	//hash := sha256.New()
+	//hash.Write(raw)
+	//return hash.Sum(nil)
 }
 
 // Symmetric returns true if this key is a symmetric key,
@@ -75,11 +75,12 @@ type gmsm2PublicKey struct {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *gmsm2PublicKey) Bytes() (raw []byte, err error) {
-	raw, err = sm2.MarshalSm2PublicKey(k.pubKey)
-	if err != nil {
-		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
-	}
-	return
+	//raw, err = sm2.MarshalSm2PublicKey(k.pubKey)
+	//if err != nil {
+	//	return nil, fmt.Errorf("Failed marshalling key [%s]", err)
+	//}
+	//return
+	return SerializeCompressed(k), nil
 }
 
 // SKI returns the subject key identifier of this key.
@@ -87,14 +88,36 @@ func (k *gmsm2PublicKey) SKI() (ski []byte) {
 	if k.pubKey == nil {
 		return nil
 	}
-
+	pubKeyBytes, _ := k.Bytes()
+	return utils.Hash160(pubKeyBytes)
 	// Marshall the public key
-	raw := elliptic.Marshal(k.pubKey.Curve, k.pubKey.X, k.pubKey.Y)
+	//raw := elliptic.Marshal(k.pubKey.Curve, k.pubKey.X, k.pubKey.Y)
+	//
+	//// Hash it
+	//hash := sha256.New()
+	//hash.Write(raw)
+	//return hash.Sum(nil)
+}
 
-	// Hash it
-	hash := sha256.New()
-	hash.Write(raw)
-	return hash.Sum(nil)
+// SerializeCompressed serializes a public key in a 33-byte compressed format.
+func SerializeCompressed(k *gmsm2PublicKey) []byte {
+	b := make([]byte, 0, 33)
+	p := k.pubKey
+	format := byte(0x2)
+	if isOdd(p.Y) {
+		format |= 0x1
+	}
+	b = append(b, format)
+	return paddedAppend(32, b, p.X.Bytes())
+}
+func isOdd(a *big.Int) bool {
+	return a.Bit(0) == 1
+}
+func paddedAppend(size uint, dst, src []byte) []byte {
+	for i := 0; i < int(size)-len(src); i++ {
+		dst = append(dst, 0)
+	}
+	return append(dst, src...)
 }
 
 // Symmetric returns true if this key is a symmetric key,
