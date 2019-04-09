@@ -73,8 +73,14 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 }
 func Hash(data []byte) common.Hash {
 	hashOpt, err := bccsp.GetHashOpt("GMSM3")
+	if err != nil {
+		return common.Hash{}
+	}
 	hf, err := csp.GetHash(hashOpt)
 	hf.Write([]byte("Devin"))
 	hash1 := hf.Sum(nil)
 	hash2, err := csp.Hash([]byte("Devin"), hashOpt)
+	hash1=hash1
+	hash2=hash2
+	return common.Hash{}
 }
