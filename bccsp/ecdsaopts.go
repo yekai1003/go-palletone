@@ -47,3 +47,18 @@ func (opts *ECDSAP384KeyGenOpts) Algorithm() string {
 func (opts *ECDSAP384KeyGenOpts) Ephemeral() bool {
 	return opts.Temporary
 }
+
+type ECDSAS256KeyGenOpts struct {
+	Temporary bool
+}
+
+// Algorithm returns the key generation algorithm identifier (to be used).
+func (opts *ECDSAS256KeyGenOpts) Algorithm() string {
+	return ECDSAS256
+}
+
+// Ephemeral returns true if the key to generate has to be ephemeral,
+// false otherwise.
+func (opts *ECDSAS256KeyGenOpts) Ephemeral() bool {
+	return opts.Temporary
+}

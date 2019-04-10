@@ -32,7 +32,7 @@ func TestSWFactoryGet(t *testing.T) {
 	assert.Equal(t, hash1, hash2)
 	t.Logf("Hash Devin result:%x", hash1)
 
-	privKey, err := csp.KeyGen(&bccsp.ECDSAP256KeyGenOpts{})
+	privKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{})
 	privKeyB, _ := privKey.Bytes()
 	assert.Nil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())

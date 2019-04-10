@@ -24,6 +24,7 @@ const (
 
 	// ECDSA Elliptic Curve Digital Signature Algorithm over P-256 curve
 	ECDSAP256 = "ECDSAP256"
+	ECDSAS256 = "ECDSAS256"
 
 	// ECDSA Elliptic Curve Digital Signature Algorithm over P-384 curve
 	ECDSAP384 = "ECDSAP384"
@@ -403,5 +404,20 @@ func (opts *X509PublicKeyImportOpts) Algorithm() string {
 // Ephemeral returns true if the key to generate has to be ephemeral,
 // false otherwise.
 func (opts *X509PublicKeyImportOpts) Ephemeral() bool {
+	return opts.Temporary
+}
+
+type ECDSAS256PublicKeyImportOpts struct {
+	Temporary bool
+}
+
+// Algorithm returns the key importation algorithm identifier (to be used).
+func (opts *ECDSAS256PublicKeyImportOpts) Algorithm() string {
+	return ECDSAS256
+}
+
+// Ephemeral returns true if the key generated has to be ephemeral,
+// false otherwise.
+func (opts *ECDSAS256PublicKeyImportOpts) Ephemeral() bool {
 	return opts.Temporary
 }

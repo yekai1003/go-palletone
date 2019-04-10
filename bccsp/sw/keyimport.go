@@ -123,6 +123,17 @@ func (*ecdsaGoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	return &ecdsaPublicKey{lowLevelKey}, nil
 }
 
+type ecdsaS256PublicKeyImportOptsKeyImporter struct{}
+
+func (*ecdsaS256PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
+	lowLevelKey, ok := raw.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, errors.New("Invalid raw material. Expected *ecdsa.PublicKey.")
+	}
+
+	return &ecdsaPublicKey{lowLevelKey}, nil
+}
+
 type rsaGoPublicKeyImportOptsKeyImporter struct{}
 
 func (*rsaGoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {

@@ -12,6 +12,7 @@ import (
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"github.com/btcsuite/btcd/btcec"
 	"math/big"
 )
 
@@ -29,6 +30,7 @@ var (
 		elliptic.P256(): new(big.Int).Rsh(elliptic.P256().Params().N, 1),
 		elliptic.P384(): new(big.Int).Rsh(elliptic.P384().Params().N, 1),
 		elliptic.P521(): new(big.Int).Rsh(elliptic.P521().Params().N, 1),
+		btcec.S256():    new(big.Int).Rsh(btcec.S256().Params().N, 1),
 	}
 )
 
