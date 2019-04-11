@@ -222,6 +222,9 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 	return
 }
 func ski2Address(ski []byte) string {
+	if len(ski) < 20 {
+		return ""
+	}
 	return "P" + base58.CheckEncode(ski[0:20], byte(0))
 }
 func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err error) {

@@ -19,7 +19,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"encoding/hex"
+
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -111,7 +111,8 @@ func TestBigKeyFile(t *testing.T) {
 
 	_, err = ks.GetKey(ski)
 	assert.Error(t, err)
-	expected := fmt.Sprintf("Key with SKI %s not found in %s", hex.EncodeToString(ski), ksPath)
+
+	expected := fmt.Sprintf("Key with SKI %s not found in %s", ski2Address(ski), ksPath)
 	assert.EqualError(t, err, expected)
 
 	// 1k, so that the key would be found

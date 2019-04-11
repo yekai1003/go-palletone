@@ -17,9 +17,10 @@ package sw
 
 import (
 	"crypto/ecdsa"
-
+	"crypto/x509"
 	"errors"
-
+	"fmt"
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
 
@@ -77,11 +78,16 @@ type ecdsaPublicKey struct {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *ecdsaPublicKey) Bytes() (raw []byte, err error) {
-	//raw, err = x509.MarshalPKIXPublicKey(k.pubKey)
-	//if err != nil {
-	//	return nil, fmt.Errorf("Failed marshalling key [%s]", err)
-	//}
-	return SerializeCompressed(k), nil
+	if k.pubKey.Curve == btcec.S256() {
+		return SerializeCompressed(k), nil
+	}
+
+	raw, err = x509.MarshalPKIXPublicKey(k.pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
+	}
+	return
+
 }
 
 // SerializeCompressed serializes a public key in a 33-byte compressed format.

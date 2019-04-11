@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
 )
@@ -126,12 +127,18 @@ func (*ecdsaGoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 type ecdsaS256PublicKeyImportOptsKeyImporter struct{}
 
 func (*ecdsaS256PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
-	lowLevelKey, ok := raw.(*ecdsa.PublicKey)
+	compressedPubKey, ok := raw.([]byte)
 	if !ok {
-		return nil, errors.New("Invalid raw material. Expected *ecdsa.PublicKey.")
+		return nil, errors.New("Invalid raw material. Expected []byte.")
 	}
-
-	return &ecdsaPublicKey{lowLevelKey}, nil
+	if len(compressedPubKey) != 33 {
+		return nil, errors.New("invalid compressed public key length")
+	}
+	key, err := btcec.ParsePubKey(compressedPubKey, btcec.S256())
+	if err != nil {
+		return nil, err
+	}
+	return &ecdsaPublicKey{key.ToECDSA()}, nil
 }
 
 type rsaGoPublicKeyImportOptsKeyImporter struct{}
