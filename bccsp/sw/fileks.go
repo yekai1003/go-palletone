@@ -31,6 +31,7 @@ import (
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/palletone/go-palletone/common/log"
+    "github.com/tjfoc/gmsm/sm2"
 )
 
 // NewFileBasedKeyStore instantiated a file-based key store at a given position.
@@ -434,4 +435,22 @@ func (ks *fileBasedKeyStore) openKeyStore() error {
 
 func (ks *fileBasedKeyStore) getPathForAlias(alias, suffix string) string {
 	return filepath.Join(ks.path, alias+"_"+suffix)
+}
+
+func readKeyFromFile(privKeyPath , pubKeyPath string , pass []byte)(*sm2.PrivateKey,*sm2.PublicKey,  bool){
+    fmt.Println("begin to read！！！",privKeyPath)
+    fmt.Println("pass is ！！！",pass)
+	privateKey, e := sm2.ReadPrivateKeyFromPem(privKeyPath, pass)
+	if e != nil{
+		fmt.Println("failed to read privateKey ！！！")
+		return nil,nil,false
+	}
+	fmt.Printf("privateKey is %+v\n",privateKey)
+	publicKey, i := sm2.ReadPublicKeyFromPem(pubKeyPath, pass)
+	if i!=nil{
+		fmt.Println("failed to read publicKey ！！！")
+		return nil,nil,false
+	}
+	fmt.Printf("publicKey is %+v\n",publicKey)
+	return privateKey,publicKey,true
 }

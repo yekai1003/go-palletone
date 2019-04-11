@@ -28,6 +28,9 @@ import (
 
 	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/tjfoc/gmsm/sm2"
+	"crypto/sha256"
+	//"github.com/btcsuite/btcutil/base58"
 )
 
 func TestInvalidStoreKey(t *testing.T) {
@@ -129,4 +132,44 @@ func TestReInitKeyStore(t *testing.T) {
 	assert.True(t, isFileBased)
 	err = fbKs.Init(nil, ksPath, false)
 	assert.EqualError(t, err, "KeyStore already initilized.")
+} 
+
+ 
+func TestKeyStore_Read(t *testing.T) {
+        fmt.Println("----------writeKeyToFile---------") 
+	privateKey, e := sm2.GenerateKey()
+	fmt.Printf("--sm2.GenerateKey()-----%+v\n",privateKey)
+	publicKey := &privateKey.PublicKey
+	if e != nil{
+		fmt.Println("获取密钥对失败！")
+	}
+	raw := elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y)
+    // Hash it
+    hash := sha256.New()
+    hash.Write(raw)
+    ski:= hash.Sum(nil)
+    addr:= ski2Address(ski)
+    b, i := sm2.WritePrivateKeytoPem("/tmp/privateKey", privateKey, []byte(addr))
+	pem, i2 := sm2.WritePublicKeytoPem("/tmp/publicKey", publicKey, []byte(addr))
+ 
+	if b||pem {
+		fmt.Println("密钥已成功写入文件！")
+	}else {
+		fmt.Println("密钥对写入文件失败！")
+	}
+	if i != nil||i2 !=nil {
+		fmt.Println("密钥对写入文件错误！！！")
+	}
+	//writeKeyToFile("/tmp/privateKey", "/tmp/publicKey", []byte("i am  wek && The_Reader "))
+	privateKey, publicKey, b = readKeyFromFile("/tmp/privateKey", "/tmp/publicKey",  []byte(addr))
+	if b {
+		fmt.Println("readKeyFromFile Is success ! ")
+		fmt.Println("the privateKey is ",*privateKey," ")
+		fmt.Println("the publicKey is ", *publicKey," ")
+	}else {
+		fmt.Println("readKeyFromFile Is Faild ! ")
+	}
 }
+
+
+
