@@ -324,11 +324,16 @@ func PublicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
 		if k == nil {
 			return nil, errors.New("Invalid ecdsa public key. It must be different from nil.")
 		}
-		PubASN1, err := x509.MarshalPKIXPublicKey(k)
-		if err != nil {
-			return nil, err
+		var PubASN1 []byte
+		var err error
+		if k.Curve == btcec.S256() {
+			PubASN1 = (*btcec.PublicKey)(publicKey.(*ecdsa.PublicKey)).SerializeCompressed()
+		} else {
+			PubASN1, err = x509.MarshalPKIXPublicKey(k)
+			if err != nil {
+				return nil, err
+			}
 		}
-
 		return pem.EncodeToMemory(
 			&pem.Block{
 				Type:  "PUBLIC KEY",
@@ -477,7 +482,13 @@ func DERToPublicKey(raw []byte) (pub interface{}, err error) {
 	if len(raw) == 0 {
 		return nil, errors.New("Invalid DER. It must be different from nil.")
 	}
-
+	if len(raw) == 33 { //S256 compressed pubkey
+		key, err := btcec.ParsePubKey(raw, btcec.S256())
+		if err != nil {
+			return nil, err
+		}
+		return key.ToECDSA(), nil
+	}
 	key, err := x509.ParsePKIXPublicKey(raw)
 	if err != nil {
 		key, err = sm2.ParseSm2PublicKey(raw)

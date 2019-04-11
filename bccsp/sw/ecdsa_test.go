@@ -20,7 +20,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha256"
+
 	"crypto/x509"
 	"math/big"
 	"testing"
@@ -132,10 +132,13 @@ func TestEcdsaPrivateKey(t *testing.T) {
 
 	k.privKey = lowLevelKey
 	ski = k.SKI()
-	raw := elliptic.Marshal(k.privKey.Curve, k.privKey.PublicKey.X, k.privKey.PublicKey.Y)
-	hash := sha256.New()
-	hash.Write(raw)
-	ski2 := hash.Sum(nil)
+	// raw := elliptic.Marshal(k.privKey.Curve, k.privKey.PublicKey.X, k.privKey.PublicKey.Y)
+	// hash := sha256.New()
+	// hash.Write(raw)
+	// ski2 := hash.Sum(nil)
+	pub, _ := k.PublicKey()
+	pubB, _ := pub.Bytes()
+	ski2 := utils.Hash160(pubB)
 	assert.Equal(t, ski2, ski, "SKI is not computed in the right way.")
 
 	pk, err := k.PublicKey()
@@ -162,10 +165,13 @@ func TestEcdsaPublicKey(t *testing.T) {
 
 	k.pubKey = &lowLevelKey.PublicKey
 	ski = k.SKI()
-	raw := elliptic.Marshal(k.pubKey.Curve, k.pubKey.X, k.pubKey.Y)
-	hash := sha256.New()
-	hash.Write(raw)
-	ski2 := hash.Sum(nil)
+	// raw := elliptic.Marshal(k.pubKey.Curve, k.pubKey.X, k.pubKey.Y)
+	// hash := sha256.New()
+	// hash.Write(raw)
+	// ski2 := hash.Sum(nil)
+
+	pubB, _ := k.Bytes()
+	ski2 := utils.Hash160(pubB)
 	assert.Equal(t, ski, ski2, "SKI is not computed in the right way.")
 
 	pk, err := k.PublicKey()
