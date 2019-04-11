@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"github.com/palletone/go-palletone/contracts/shim"
 	dagConstants "github.com/palletone/go-palletone/dag/constants"
+	"time"
 )
 
 // This is the basic validation
@@ -36,6 +37,7 @@ func ValidateCert(issuer string, cert *x509.Certificate, stub shim.ChaincodeStub
 	if err := validateIssuer(issuer, cert, stub); err != nil {
 		return err
 	}
+	// validate
 
 	return nil
 }
@@ -102,15 +104,74 @@ func validateIssuer(issuer string, cert *x509.Certificate, stub shim.ChaincodeSt
 		return err
 	}
 	// check in intermediate certificate
-	if issuer != rootCAHolder {
-		// query server list
-		certids, err := queryCertsIDs(dagConstants.CERT_SERVER_SYMBOL, issuer, stub)
+	rootCert, err := GetRootCert(stub)
+	if err != nil {
+		return err
+	}
+	if issuer == rootCAHolder {
+		if cert.Issuer.String() != rootCert.Subject.String() {
+			return fmt.Errorf("cert issuer is invalid")
+		}
+	} else {
+		// query certid
+		certid, err := GetCertIDBySubject(cert.Issuer.String(), stub)
 		if err != nil {
 			return err
 		}
-		if len(certids) <= 0 {
+		if certid == "" {
+			return fmt.Errorf("Has no validate intermidate certificate")
+		}
+		// query server list
+		revocationTime, err := GetCertRevocationTime(issuer, certid, stub)
+		if err != nil {
+			return err
+		}
+		if revocationTime.IsZero() || revocationTime.String() < time.Now().String() {
 			return fmt.Errorf("Has no validate intermidate certificate")
 		}
 	}
 	return nil
 }
+
+// This is the certificate chain validation
+// To validate certificate chain signature
+func ValidateCertChain(cert *x509.Certificate, stub shim.ChaincodeStubInterface) error {
+	// query root ca cert bytes
+	rootCABytes, err := stub.GetSystemConfig("RootCABytes")
+	if err != nil {
+		return err
+	}
+	val, err := loadCertBytes([]byte(rootCABytes))
+	if err != nil {
+		return err
+	}
+	rootCert, err := x509.ParseCertificate(val)
+	// query intermidate cert bytes
+	chancerts := []*x509.Certificate{}
+	if cert.Issuer.String() != rootCert.Subject.String() {
+		chancerts, err = GetIntermidateCertChains(cert, rootCert.Subject.String(), stub)
+		if err != nil {
+			return err
+		}
+	}
+	// package x509.VerifyOptions, Intermediates and Roots field
+	roots := x509.NewCertPool()
+	roots.AddCert(rootCert)
+
+	intermediates := x509.NewCertPool()
+	for _, newCert := range chancerts {
+		intermediates.AddCert(newCert)
+	}
+	opts := x509.VerifyOptions{
+		Roots:         roots,
+		Intermediates: intermediates,
+	}
+	// user x509.Verify to verify cert chain
+	if _, err := cert.Verify(opts); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// This is the certificate chain organization
