@@ -170,6 +170,17 @@ func TestKeyStore_Read(t *testing.T) {
 	}else {
 		fmt.Println("readKeyFromFile Is Faild ! ")
 	}
+	raw1 := elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y)
+    // Hash it
+    hash1 := sha256.New()
+    hash1.Write(raw1)
+    ski1:= hash.Sum(nil)
+    addr1:= ski2Address(ski1)
+    if addr1 == addr {
+        fmt.Println("addr is addr1  ! ")
+    }else{
+    	fmt.Println("addr is not equal addr1 ! ")
+    }
 }
 
 
