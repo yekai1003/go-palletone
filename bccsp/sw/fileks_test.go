@@ -139,11 +139,11 @@ func TestReInitKeyStore(t *testing.T) {
 func TestKeyStore_Read(t *testing.T) {
         fmt.Println("----------writeKeyToFile---------") 
 	privateKey, e := sm2.GenerateKey()
-	fmt.Printf("--sm2.GenerateKey()-----%+v\n",privateKey)
-	publicKey := &privateKey.PublicKey
 	if e != nil{
 		fmt.Println("获取密钥对失败！")
 	}
+	fmt.Printf("--sm2.GenerateKey()-----%+v\n",privateKey)
+	publicKey := &privateKey.PublicKey
 	raw := elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y)
     // Hash it
     hash := sha256.New()

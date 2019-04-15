@@ -40,6 +40,7 @@ import (
 	"github.com/palletone/go-palletone/common/util"
 	"github.com/palletone/go-palletone/core/accounts"
 	"github.com/palletone/go-palletone/dag/modules"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 var (
@@ -76,7 +77,25 @@ type unlocked struct {
 	*Key
 	abort chan struct{}
 }
+// KeyStore manages a key storage directory on disk.
+type Sm2KeyStore struct {
+	storage  sm2keyStore                     // Storage backend, might be cleartext or encrypted
+	cache    *accountCache                // In-memory account cache over the filesystem storage
+	changes  chan struct{}                // Channel receiving change notifications from the cache
+	sm2unlocked map[common.Address]*sm2unlocked // Currently unlocked account (decrypted private keys)
 
+	wallets     []accounts.Wallet       // Wallet wrappers around the individual key files
+	updateFeed  event.Feed              // Event feed to notify wallet additions/removals
+	updateScope event.SubscriptionScope // Subscription scope tracking current live listeners
+	updating    bool                    // Whether the event notification loop is running
+
+	mu sync.RWMutex
+}
+
+type sm2unlocked struct {
+	Key *sm2.PrivateKey
+	abort chan struct{}
+}
 // NewKeyStore creates a keystore for the given directory.
 func NewKeyStore(keydir string, scryptN, scryptP int) *KeyStore {
 	keydir, _ = filepath.Abs(keydir)
@@ -342,7 +361,10 @@ func (ks *KeyStore) SignTxWithPassphrase(a accounts.Account, passphrase string, 
 func (ks *KeyStore) Unlock(a accounts.Account, passphrase string) error {
 	return ks.TimedUnlock(a, passphrase, 0)
 }
-
+// Unlock unlocks the given account indefinitely.
+func (ks *Sm2KeyStore) UnlockSm2(a accounts.Account, passphrase string) error {
+	return ks.TimedUnlock(a, passphrase, 0)
+}
 // Lock removes the private key with the given address from memory.
 func (ks *KeyStore) Lock(addr common.Address) error {
 	ks.mu.Lock()
@@ -390,7 +412,34 @@ func (ks *KeyStore) TimedUnlock(a accounts.Account, passphrase string, timeout t
 	ks.unlocked[a.Address] = u
 	return nil
 }
+func (ks *Sm2KeyStore) TimedUnlock(a accounts.Account, passphrase string, timeout time.Duration) error {
+	a, key, err := ks.getDecryptedKey(a, passphrase)
+	if err != nil {
+		return err
+	}
 
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+	u, found := ks.sm2unlocked[a.Address]
+	if found {
+		if u.abort == nil {
+			// The address was unlocked indefinitely, so unlocking
+			// it with a timeout would be confusing.
+			//ZeroKey(key.PrivateKey)
+			return nil
+		}
+		// Terminate the expire goroutine and replace it below.
+		close(u.abort)
+	}
+	if timeout > 0 {
+		u = &sm2unlocked{Key: key, abort: make(chan struct{})}
+		go ks.expire(a.Address, u, timeout)
+	} else {
+		u = &sm2unlocked{Key: key}
+	}
+	ks.sm2unlocked[a.Address] = u
+	return nil
+}
 func (ks *KeyStore) IsUnlock(addr common.Address) bool {
 	_, found := ks.unlocked[addr]
 
@@ -405,13 +454,29 @@ func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 	ks.cache.mu.Unlock()
 	return a, err
 }
-
+// Find resolves the given account into a unique entry in the keystore.
+func (ks *Sm2KeyStore) Find(a accounts.Account) (accounts.Account, error) {
+	ks.cache.maybeReload()
+	ks.cache.mu.Lock()
+	a, err := ks.cache.find(a)
+	ks.cache.mu.Unlock()
+	return a, err
+}
 func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
 	a, err := ks.Find(a)
 	if err != nil {
 		return a, nil, err
 	}
 	key, err := ks.storage.GetKey(a.Address, a.URL.Path, auth)
+	return a, key, err
+}
+
+func (ks *Sm2KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *sm2.PrivateKey, error) {
+	a, err := ks.Find(a)
+	if err != nil {
+		return a, nil, err
+	}
+	key, err := ks.storage.GetKeySm2(a.Address, a.URL.Path, auth)
 	return a, key, err
 }
 
@@ -435,6 +500,25 @@ func (ks *KeyStore) expire(addr common.Address, u *unlocked, timeout time.Durati
 	}
 }
 
+func (ks *Sm2KeyStore) expire(addr common.Address, u *sm2unlocked, timeout time.Duration) {
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+	select {
+	case <-u.abort:
+		// just quit
+	case <-t.C:
+		ks.mu.Lock()
+		// only drop if it's still the same key instance that dropLater
+		// was launched with. we can check that using pointer equality
+		// because the map stores a new pointer every time the key is
+		// unlocked.
+		if ks.sm2unlocked[addr] == u {
+			//ZeroKey(u.PrivateKey)
+			delete(ks.sm2unlocked, addr)
+		}
+		ks.mu.Unlock()
+	}
+}
 // NewAccount generates a new key and stores it into the key directory,
 // encrypting it with the passphrase.
 func (ks *KeyStore) NewAccount(passphrase string) (accounts.Account, error) {

@@ -32,6 +32,9 @@ import (
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/core/accounts"
 	"github.com/pborman/uuid"
+	"crypto/elliptic"
+	"github.com/tjfoc/gmsm/sm2"
+	"crypto/sha256"
 )
 
 const (
@@ -52,6 +55,14 @@ type keyStore interface {
 	GetKey(addr common.Address, filename string, auth string) (*Key, error)
 	// Writes and encrypts the key.
 	StoreKey(filename string, k *Key, auth string) error
+	// Joins filename with the key directory unless it is already absolute.
+	JoinPath(filename string) string
+}
+type sm2keyStore interface {
+	// Loads and decrypts the key from disk.
+	GetKeySm2(addr common.Address, filename string, auth string) (*sm2.PrivateKey, error)
+	// Writes and encrypts the key.
+	StoreKeySm2(filename string, k *sm2.PrivateKey, auth string) error
 	// Joins filename with the key directory unless it is already absolute.
 	JoinPath(filename string) string
 }
@@ -157,6 +168,13 @@ func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
 // 	return key
 // }
 
+func sm2newKey(rand io.Reader) (*sm2.PrivateKey, error) {
+	sm2privateKey, err := sm2.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	return sm2privateKey, nil
+}
 func newKey(rand io.Reader) (*Key, error) {
 	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
 	if err != nil {
@@ -164,7 +182,29 @@ func newKey(rand io.Reader) (*Key, error) {
 	}
 	return newKeyFromECDSA(privateKeyECDSA), nil
 }
-
+func sm2storeNewKey(ks sm2keyStore, rand io.Reader, auth string) (*sm2.PrivateKey, accounts.Account, error) {
+	privateKey, err := sm2newKey(rand)
+	if err != nil {
+		return nil, accounts.Account{}, err
+	}
+	publicKey := &privateKey.PublicKey
+	raw := elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y)
+    // Hash it
+    hash := sha256.New()
+    hash.Write(raw)
+    ski:= hash.Sum(nil)
+    saddr:= common.Ski2Address(ski)
+    addr ,err := common.StringToAddress(saddr)
+    if err != nil {
+		return nil, accounts.Account{}, err
+	}
+	a := accounts.Account{Address: addr, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(addr))}}
+	if err := ks.StoreKeySm2(a.URL.Path, privateKey, auth); err != nil {
+		//ZeroKey(key.PrivateKey)
+		return nil, a, err
+	}
+	return privateKey, a, err
+}
 func storeNewKey(ks keyStore, rand io.Reader, auth string) (*Key, accounts.Account, error) {
 	key, err := newKey(rand)
 	if err != nil {

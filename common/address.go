@@ -318,3 +318,10 @@ type SignatureError struct {
 	MsgIndex   uint32
 	Error      error
 }
+
+func Ski2Address(ski []byte) string {
+	if len(ski) < 20 {
+		return ""
+	}
+	return "P" + base58.CheckEncode(ski[0:20], byte(0))
+}

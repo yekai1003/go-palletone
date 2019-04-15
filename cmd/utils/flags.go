@@ -723,6 +723,19 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	}
 
 }
+// MakeAddress converts an account specified directly as a hex encoded string or
+// a key index in the key store to an internal account representation.
+func MakeAddressSm2(ks *keystore.Sm2KeyStore, account string) (accounts.Account, error) {
+	// If the specified account is a valid address, return it
+	addr, err := common.StringToAddress(account)
+	if err == nil {
+		return accounts.Account{Address: addr}, nil
+	} else {
+		return accounts.Account{}, fmt.Errorf("invalid account address: %s", account)
+	}
+
+}
+
 
 // setEtherbase retrieves the etherbase either from the directly specified
 // command line flags or from the keystore if CLI indexed.

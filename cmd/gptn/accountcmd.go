@@ -317,6 +317,35 @@ func unlockAccount(ctx *cli.Context, ks *keystore.KeyStore, address string, i in
 	return accounts.Account{}, ""
 }
 
+// tries unlocking the specified account a few times.
+func unlocksm2Account(ctx *cli.Context, ks *keystore.Sm2KeyStore, address string, i int, passwords []string) (accounts.Account, string) {
+	account, err := utils.MakeAddressSm2(ks, address)
+	if err != nil {
+		utils.Fatalf("Could not list accounts: %v", err)
+	}
+	for trials := 0; trials < 3; trials++ {
+		prompt := fmt.Sprintf("Unlocking account %s | Attempt %d/%d", address, trials+1, 3)
+		password := getPassPhrase(prompt, false, i, passwords)
+		err = ks.UnlockSm2(account, password)
+		if err == nil {
+			log.Info("Unlocked account", "address", account.Address.Str())
+			return account, password
+		}
+		if err, ok := err.(*keystore.AmbiguousAddrError); ok {
+			log.Info("Unlocked account", "address", account.Address.Str())
+			return sm2ambiguousAddrRecovery(ks, err, password), password
+		}
+		if err != keystore.ErrDecrypt {
+			// No need to prompt again if the error is not decryption-related.
+			log.Info("Unlocked account err:", err.Error())
+			break
+		}
+	}
+	// All trials expended to unlock account, bail out
+	utils.Fatalf("Failed to unlock account %s (%v)", address, err)
+
+	return accounts.Account{}, ""
+}
 // getPassPhrase retrieves the password associated with an account, either fetched
 // from a list of preloaded passphrases, or requested interactively from the user.
 func getPassPhrase(prompt string, confirmation bool, i int, passwords []string) string {
@@ -373,6 +402,31 @@ func ambiguousAddrRecovery(ks *keystore.KeyStore, err *keystore.AmbiguousAddrErr
 	return *match
 }
 
+func sm2ambiguousAddrRecovery(ks *keystore.Sm2KeyStore, err *keystore.AmbiguousAddrError, auth string) accounts.Account {
+	fmt.Printf("Multiple key files exist for address %x:\n", err.Addr)
+	for _, a := range err.Matches {
+		fmt.Println("  ", a.URL)
+	}
+	fmt.Println("Testing your passphrase against all of them...")
+	var match *accounts.Account
+	for _, a := range err.Matches {
+		if err := ks.UnlockSm2(a, auth); err == nil {
+			match = &a
+			break
+		}
+	}
+	if match == nil {
+		utils.Fatalf("None of the listed files could be unlocked.")
+	}
+	fmt.Printf("Your passphrase unlocked %s\n", match.URL)
+	fmt.Println("In order to avoid this warning, you need to remove the following duplicate key files:")
+	for _, a := range err.Matches {
+		if a != *match {
+			fmt.Println("  ", a.URL)
+		}
+	}
+	return *match
+}
 // accountCreate creates a new account into the keystore defined by the CLI flags.
 func createAccount(ctx *cli.Context, password string) (common.Address, error) {
 	var err error
@@ -387,7 +441,7 @@ func createAccount(ctx *cli.Context, password string) (common.Address, error) {
 	utils.SetNodeConfig(ctx, &cfg.Node, configDir)
 	scryptN, scryptP, keydir, err := cfg.Node.AccountConfig()
 
-	address, err := keystore.StoreKey(keydir, password, scryptN, scryptP)
+	address, err := keystore.StoreKeySm2(keydir, password, scryptN, scryptP)
 	if err != nil {
 		utils.Fatalf("Failed to create account: %v", err)
 	}
