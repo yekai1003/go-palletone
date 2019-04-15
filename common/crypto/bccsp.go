@@ -24,6 +24,8 @@ import (
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/factory"
 	"github.com/palletone/go-palletone/common"
+
+	"github.com/palletone/go-palletone/common/log"
 )
 
 type HashType byte
@@ -42,7 +44,7 @@ const (
 
 var csp bccsp.BCCSP
 var hashOpt bccsp.HashOpts
-
+var keyImportOpt bccsp.KeyImportOpts
 func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 	f := &factory.SWFactory{}
 
@@ -53,7 +55,7 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 			FileKeystore: &factory.FileKeystoreOpts{KeyStorePath: keystorePath},
 		},
 	}
-	hashOpt, _ = bccsp.GetHashOpt("GMSM3")
+	hashOpt, _ = bccsp.GetHashOpt("SHA3")
 	if hashType == HashType_GM3 {
 		opts = &factory.FactoryOpts{
 			SwOpts: &factory.SwOpts{
@@ -69,18 +71,36 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 	if err != nil {
 		return err
 	}
+	keyImportOpt=&bccsp.ECDSAS256PublicKeyImportOpts{}
+	if cryptoType== CryptoType_GM2_256{
+	keyImportOpt=&bccsp.GMSM2PublicKeyImportOpts{}
+	}
 	return nil
 }
 func Hash(data []byte) common.Hash {
-	hashOpt, err := bccsp.GetHashOpt("GMSM3")
-	if err != nil {
-		return common.Hash{}
+
+	hf, _ := csp.GetHash(hashOpt)
+	hf.Write(data)
+	hash := hf.Sum(nil)
+	return common.BytesToHash( hash)
+}
+func SignByAddress(hash []byte, addr common.Address ) ([]byte, error) {
+	ski:=addr.Bytes()
+	prvKey,err:=csp.GetKey(ski)
+	if err!=nil{
+		return nil,err
 	}
-	hf, err := csp.GetHash(hashOpt)
-	hf.Write([]byte("Devin"))
-	hash1 := hf.Sum(nil)
-	hash2, err := csp.Hash([]byte("Devin"), hashOpt)
-	hash1=hash1
-	hash2=hash2
-	return common.Hash{}
+	return csp.Sign(prvKey,hash,nil)
+}
+func VerifySign(pubkey, hash, signature []byte) bool {
+	pubKey,err:=csp.KeyImport(pubkey,&bccsp.ECDSAS256PublicKeyImportOpts{})
+	if err!=nil{
+		return false
+	}
+	valid, err := csp.Verify(pubKey, signature, hash, nil)
+	if err!=nil {
+		log.Errorf("Verify signature error:%s", err.Error())
+		return false
+	}
+	return valid
 }

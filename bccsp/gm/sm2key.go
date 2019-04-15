@@ -17,11 +17,13 @@ package gm
 
 import (
 	"errors"
+	"fmt"
+
+	"math/big"
 
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/tjfoc/gmsm/sm2"
-	"math/big"
 )
 
 type gmsm2PrivateKey struct {
@@ -75,12 +77,12 @@ type gmsm2PublicKey struct {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *gmsm2PublicKey) Bytes() (raw []byte, err error) {
-	//raw, err = sm2.MarshalSm2PublicKey(k.pubKey)
-	//if err != nil {
-	//	return nil, fmt.Errorf("Failed marshalling key [%s]", err)
-	//}
-	//return
-	return SerializeCompressed(k), nil
+	raw, err = sm2.MarshalSm2PublicKey(k.pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
+	}
+	return
+	// return SerializeCompressed(k), nil
 }
 
 // SKI returns the subject key identifier of this key.
