@@ -46,8 +46,8 @@ var csp bccsp.BCCSP
 var hashOpt bccsp.HashOpts
 var keyImportOpt bccsp.KeyImportOpts
 func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
+	log.Debug("Try to initial bccsp instance.")
 	f := &factory.SWFactory{}
-
 	opts := &factory.FactoryOpts{
 		SwOpts: &factory.SwOpts{
 			SecLevel:     256,
@@ -55,7 +55,11 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 			FileKeystore: &factory.FileKeystoreOpts{KeyStorePath: keystorePath},
 		},
 	}
-	hashOpt, _ = bccsp.GetHashOpt("SHA3")
+	var err error
+	hashOpt, err = bccsp.GetHashOpt("SHA3_256")
+	if err!=nil{
+		return err
+	}
 	if hashType == HashType_GM3 {
 		opts = &factory.FactoryOpts{
 			SwOpts: &factory.SwOpts{
@@ -66,7 +70,7 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 		}
 		hashOpt, _ = bccsp.GetHashOpt("GMSM3")
 	}
-	var err error
+
 	csp, err = f.Get(opts)
 	if err != nil {
 		return err
@@ -84,8 +88,18 @@ func Hash(data []byte) common.Hash {
 	hash := hf.Sum(nil)
 	return common.BytesToHash( hash)
 }
+func GenerateNewAddress() (common.Address,error){
+	prvKey,err:= csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{Temporary:false})
+	if err!=nil{
+		return common.Address{},err
+	}
+	log.Debugf("Generate new key ski:%x",prvKey.SKI())
+	return common.NewAddress(prvKey.SKI(), common.PublicKeyHash),nil
+}
+
 func SignByAddress(hash []byte, addr common.Address ) ([]byte, error) {
 	ski:=addr.Bytes()
+	log.Debugf("Try get key by ski:%x",ski)
 	prvKey,err:=csp.GetKey(ski)
 	if err!=nil{
 		return nil,err

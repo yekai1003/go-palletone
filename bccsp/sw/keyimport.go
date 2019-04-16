@@ -99,18 +99,27 @@ func (*ecdsaPrivateKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bcc
 	if len(der) == 0 {
 		return nil, errors.New("[ECDSADERPrivateKeyImportOpts] Invalid raw. It must not be nil.")
 	}
+	if opts.Algorithm()=="DER" {
 
-	lowLevelKey, err := utils.DERToPrivateKey(der)
-	if err != nil {
-		return nil, fmt.Errorf("Failed converting PKIX to ECDSA public key [%s]", err)
+		lowLevelKey, err := utils.DERToPrivateKey(der)
+		if err != nil {
+			return nil, fmt.Errorf("Failed converting PKIX to ECDSA public key [%s]", err)
+		}
+
+		ecdsaSK, ok := lowLevelKey.(*ecdsa.PrivateKey)
+		if !ok {
+			return nil, errors.New("Failed casting to ECDSA private key. Invalid raw material.")
+		}
+
+		return &ecdsaPrivateKey{ecdsaSK}, nil
+	}else if opts.Algorithm()=="Hex"{
+		prvKey,err:= utils.ToECDSA(der)
+		if err!=nil{
+			return nil, err
+		}
+		return &ecdsaPrivateKey{privKey:prvKey}, nil
 	}
-
-	ecdsaSK, ok := lowLevelKey.(*ecdsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("Failed casting to ECDSA private key. Invalid raw material.")
-	}
-
-	return &ecdsaPrivateKey{ecdsaSK}, nil
+	return nil,fmt.Errorf("Unsupport import format/Algorithm")
 }
 
 type ecdsaGoPublicKeyImportOptsKeyImporter struct{}

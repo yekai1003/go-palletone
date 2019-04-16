@@ -287,6 +287,7 @@ func (ks *fileBasedKeyStore) getSuffix(alias string) string {
 }
 
 func (ks *fileBasedKeyStore) storePrivateKey(alias string, privateKey interface{}) error {
+	log.Debugf("Try store private key to file.%s",alias)
 	rawKey, err := utils.PrivateKeyToPEM(privateKey, ks.pwd)
 	if err != nil {
 		log.Errorf("Failed converting private key to PEM [%s]: [%s]", alias, err)
