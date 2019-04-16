@@ -150,6 +150,17 @@ func (ks *KeyStore) Wallets() []accounts.Wallet {
 	copy(cpy, ks.wallets)
 	return cpy
 }
+func (ks *Sm2KeyStore) Wallets() []accounts.Wallet {
+	// Make sure the list of wallets is in sync with the account cache
+	ks.refreshWallets()
+
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+
+	cpy := make([]accounts.Wallet, len(ks.wallets))
+	copy(cpy, ks.wallets)
+	return cpy
+}
 
 // refreshWallets retrieves the current account list and based on that does any
 // necessary wallet refreshes.
@@ -195,7 +206,50 @@ func (ks *KeyStore) refreshWallets() {
 		ks.updateFeed.Send(event)
 	}
 }
+// refreshWallets retrieves the current account list and based on that does any
+// necessary wallet refreshes.
+func (ks *Sm2KeyStore) refreshWallets() {
+	// Retrieve the current list of accounts
+	ks.mu.Lock()
+	accs := ks.cache.accounts()
 
+	// Transform the current list of wallets into the new one
+	wallets := make([]accounts.Wallet, 0, len(accs))
+	events := []accounts.WalletEvent{}
+
+	for _, account := range accs {
+		// Drop wallets while they were in front of the next account
+		for len(ks.wallets) > 0 && ks.wallets[0].URL().Cmp(account.URL) < 0 {
+			events = append(events, accounts.WalletEvent{Wallet: ks.wallets[0], Kind: accounts.WalletDropped})
+			ks.wallets = ks.wallets[1:]
+		}
+		// If there are no more wallets or the account is before the next, wrap new wallet
+		if len(ks.wallets) == 0 || ks.wallets[0].URL().Cmp(account.URL) > 0 {
+			wallet := &sm2keystoreWallet{account: account, keystore: ks}
+
+			events = append(events, accounts.WalletEvent{Wallet: wallet, Kind: accounts.WalletArrived})
+			wallets = append(wallets, wallet)
+			continue
+		}
+		// If the account is the same as the first wallet, keep it
+		if ks.wallets[0].Accounts()[0] == account {
+			wallets = append(wallets, ks.wallets[0])
+			ks.wallets = ks.wallets[1:]
+			continue
+		}
+	}
+	// Drop any leftover wallets and set the new batch
+	for _, wallet := range ks.wallets {
+		events = append(events, accounts.WalletEvent{Wallet: wallet, Kind: accounts.WalletDropped})
+	}
+	ks.wallets = wallets
+	ks.mu.Unlock()
+
+	// Fire all wallet events and return
+	for _, event := range events {
+		ks.updateFeed.Send(event)
+	}
+}
 // Subscribe implements accounts.Backend, creating an async subscription to
 // receive notifications on the addition or removal of keystore wallets.
 func (ks *KeyStore) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
@@ -214,6 +268,23 @@ func (ks *KeyStore) Subscribe(sink chan<- accounts.WalletEvent) event.Subscripti
 	return sub
 }
 
+// Subscribe implements accounts.Backend, creating an async subscription to
+// receive notifications on the addition or removal of keystore wallets.
+func (ks *Sm2KeyStore) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
+	// We need the mutex to reliably start/stop the update loop
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	// Subscribe the caller and track the subscriber count
+	sub := ks.updateScope.Track(ks.updateFeed.Subscribe(sink))
+
+	// Subscribers require an active notification loop, start it
+	if !ks.updating {
+		ks.updating = true
+		go ks.updater()
+	}
+	return sub
+}
 // updater is responsible for maintaining an up-to-date list of wallets stored in
 // the keystore, and for firing wallet addition/removal events. It listens for
 // account change events from the underlying account cache, and also periodically

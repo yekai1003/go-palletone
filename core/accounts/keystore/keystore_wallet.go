@@ -23,6 +23,7 @@ import (
 	"github.com/palletone/go-palletone/core/accounts"
 	//"github.com/palletone/go-palletone/core/types"
 	"github.com/palletone/go-palletone/dag/modules"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original
@@ -31,12 +32,17 @@ type keystoreWallet struct {
 	account  accounts.Account // Single account contained in this wallet
 	keystore *KeyStore        // Keystore where the account originates from
 }
-
+type sm2keystoreWallet struct {
+	account  accounts.Account // Single account contained in this wallet
+	keystore *Sm2KeyStore        // Keystore where the account originates from
+}
 // URL implements accounts.Wallet, returning the URL of the account within.
 func (w *keystoreWallet) URL() accounts.URL {
 	return w.account.URL
 }
-
+func (w *sm2keystoreWallet) URL() accounts.URL {
+	return w.account.URL
+}
 // Status implements accounts.Wallet, returning whether the account held by the
 // keystore wallet is unlocked or not.
 func (w *keystoreWallet) Status() (string, error) {
@@ -62,7 +68,9 @@ func (w *keystoreWallet) Close() error { return nil }
 func (w *keystoreWallet) Accounts() []accounts.Account {
 	return []accounts.Account{w.account}
 }
-
+func (w *sm2keystoreWallet) Accounts() []accounts.Account {
+	return []accounts.Account{w.account}
+}
 // Contains implements accounts.Wallet, returning whether a particular account is
 // or is not wrapped by this wallet instance.
 func (w *keystoreWallet) Contains(account accounts.Account) bool {
