@@ -514,7 +514,7 @@ func accountDumpKey(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx, false)
 	ks := stack.GetSm2KeyStore()
 	addr := ctx.Args().First()
-	account, _ := utils.MakeAddress(ks, addr)
+	account, _ := utils.MakeAddressSm2(ks, addr)
 	pwd := getPassPhrase("Please give a password to unlock your account", false, 0, nil)
 	prvKey, _ := ks.DumpKey(account, pwd)
 	wif := crypto.ToWIF(prvKey)
