@@ -4,6 +4,7 @@ import (
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/factory"
 	"github.com/stretchr/testify/assert"
+
 	//"os"
 	"os"
 	"testing"
@@ -33,8 +34,10 @@ func TestEcdsaP256(t *testing.T) {
 	t.Logf("Hash Devin result:%x", hash1)
 
 	privKey, err := csp.KeyGen(&bccsp.ECDSAP256KeyGenOpts{})
-	privKeyB, _ := privKey.Bytes()
 	assert.Nil(t, err)
+
+	privKeyB, err := privKey.Bytes()
+	assert.NotNil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
 	pubKey, _ := privKey.PublicKey()
 	pubKeyB, _ := pubKey.Bytes()
@@ -77,8 +80,9 @@ func TestGmFactoryGet(t *testing.T) {
 	t.Logf("Hash Devin result:%x", hash1)
 
 	privKey, err := csp.KeyGen(&bccsp.GMSM2KeyGenOpts{})
-	privKeyB, _ := privKey.Bytes()
 	assert.Nil(t, err)
+	privKeyB, err := privKey.Bytes()
+	assert.NotNil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
 	pubKey, _ := privKey.PublicKey()
 	pubKeyB, _ := pubKey.Bytes()
@@ -90,6 +94,10 @@ func TestGmFactoryGet(t *testing.T) {
 		t.Fatalf("Failed verifying ECDSA signature [%s]", err)
 	}
 	t.Log(valid)
+	pubkey2, err := csp.KeyImport(pubKeyB, &bccsp.GMSM2PublicKeyImportOpts{})
+	assert.Nil(t, err)
+	pubkey2B, _ := pubkey2.Bytes()
+	assert.Equal(t, pubKeyB, pubkey2B)
 }
 
 func TestS256(t *testing.T) {
@@ -108,12 +116,14 @@ func TestS256(t *testing.T) {
 	assert.NotNil(t, csp)
 
 	privKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{})
-	privKeyB, _ := privKey.Bytes()
 	assert.Nil(t, err)
+	privKeyB, err := privKey.Bytes()
+
+	assert.NotNil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
 	pubKey, _ := privKey.PublicKey()
 	pubKeyB, _ := pubKey.Bytes()
-	t.Logf("PubKey:%x,len:%d,SKI:%X", pubKeyB, len(pubKeyB), pubKey.SKI())
+	t.Logf("PubKey:%x,len:%d,SKI:%x", pubKeyB, len(pubKeyB), pubKey.SKI())
 	signature, err := csp.Sign(privKey, hash1, nil)
 	t.Logf("Signature:%x", signature)
 	valid, err := csp.Verify(pubKey, signature, hash1, nil)
