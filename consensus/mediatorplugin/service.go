@@ -44,6 +44,7 @@ import (
 // PalletOne wraps all methods required for producing unit.
 type PalletOne interface {
 	GetKeyStore() *keystore.KeyStore
+	GetSm2KeyStore() *keystore.Sm2KeyStore 
 	TxPool() txspool.ITxPool
 
 	SignGenericTransaction(from common.Address, tx *modules.Transaction) (*modules.Transaction, error)

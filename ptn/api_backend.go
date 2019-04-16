@@ -60,6 +60,9 @@ func (b *PtnApiBackend) Dag() dag.IDag {
 func (b *PtnApiBackend) GetKeyStore() *keystore.KeyStore {
 	return b.ptn.GetKeyStore()
 }
+func (b *PtnApiBackend) GetSm2KeyStore() *keystore.Sm2KeyStore {
+	return b.ptn.GetSm2KeyStore()
+}
 
 func (b *PtnApiBackend) TransferPtn(from, to string, amount decimal.Decimal,
 	text *string) (*mp.TxExecuteResult, error) {

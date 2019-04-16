@@ -49,6 +49,7 @@ const (
 
 type PalletOne interface {
 	GetKeyStore() *keystore.KeyStore
+	GetSm2KeyStore() *keystore.Sm2KeyStore
 	TxPool() txspool.ITxPool
 
 	MockContractLocalSend(event ContractEvent)

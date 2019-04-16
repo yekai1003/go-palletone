@@ -111,6 +111,7 @@ func StoreKey(dir, auth string, scryptN, scryptP int) (common.Address, error) {
 }
 // StoreKey generates a key, encrypts with 'auth' and stores in the given directory
 func StoreKeySm2(dir, auth string, scryptN, scryptP int) (common.Address, error) {
+	fmt.Println("-------StoreKeySm2-------------------114----")
 	_, a, err := sm2storeNewKey(&keyStorePassphrase{dir, scryptN, scryptP}, crand.Reader, auth)
 	// log.Debug("Dir: " + dir + " Auth: " + auth + " scryptN: " + strconv.Itoa(scryptN) + " scryptP: " + strconv.Itoa(scryptP))
 	// log.Debug("Address:" + a.Address.Str())
@@ -124,6 +125,9 @@ func (ks keyStorePassphrase) StoreKey(filename string, key *Key, auth string) er
 	return writeKeyFile(filename, keyjson)
 }
 func (ks keyStorePassphrase) StoreKeySm2(filename string, key *sm2.PrivateKey, auth string) error {
+	
+    fmt.Println("------keyStorePassphrase-StoreKeySm2-------------------129----")
+	fmt.Println("filename is ",filename)
 	_, err := sm2.WritePrivateKeytoPem(filename, key, []byte(auth))
 	if err != nil {
 		fmt.Println("密钥对写入文件错误！！！")

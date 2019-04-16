@@ -436,7 +436,7 @@ func createAccount(ctx *cli.Context, password string) (common.Address, error) {
 	if cfg, configDir, err = maybeLoadConfig(ctx); err != nil {
 		utils.Fatalf("%v", err)
 	}
-
+    fmt.Println("-------createAccount-------------------439----")
 	cfg.Node.P2P = cfg.P2P
 	utils.SetNodeConfig(ctx, &cfg.Node, configDir)
 	scryptN, scryptP, keydir, err := cfg.Node.AccountConfig()
@@ -512,7 +512,7 @@ func accountDumpKey(ctx *cli.Context) error {
 		utils.Fatalf("No accounts specified to update")
 	}
 	stack, _ := makeConfigNode(ctx, false)
-	ks := stack.GetKeyStore()
+	ks := stack.GetSm2KeyStore()
 	addr := ctx.Args().First()
 	account, _ := utils.MakeAddress(ks, addr)
 	pwd := getPassPhrase("Please give a password to unlock your account", false, 0, nil)

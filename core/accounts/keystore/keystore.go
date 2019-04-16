@@ -32,7 +32,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
-
+	"github.com/palletone/go-palletone/common/math"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/event"
@@ -52,6 +52,7 @@ var (
 // KeyStoreType is the reflect type of a keystore backend.
 var KeyStoreType = reflect.TypeOf(&KeyStore{})
 
+var KeyStoreTypeSm2 = reflect.TypeOf(&Sm2KeyStore{})
 // KeyStoreScheme is the protocol scheme prefixing account and wallet URLs.
 var KeyStoreScheme = "keystore"
 
@@ -556,6 +557,14 @@ func (ks *KeyStore) DumpKey(a accounts.Account, passphrase string) (privateKey [
 	return crypto.FromECDSA(key.PrivateKey), nil
 
 }
+func (ks *Sm2KeyStore) DumpKey(a accounts.Account, passphrase string) (privateKey []byte, err error) {
+	_, key, err := ks.getDecryptedKey(a, passphrase)
+	if err != nil {
+		return nil, err
+	}
+	return math.PaddedBigBytes(key.D, key.Params().BitSize/8), nil
+}
+
 func (ks *KeyStore) DumpPrivateKey(a accounts.Account, passphrase string) (privateKey *ecdsa.PrivateKey, err error) {
 	_, key, err := ks.getDecryptedKey(a, passphrase)
 	if err != nil {
