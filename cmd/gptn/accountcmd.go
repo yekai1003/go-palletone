@@ -436,11 +436,9 @@ func createAccount(ctx *cli.Context, password string) (common.Address, error) {
 	if cfg, configDir, err = maybeLoadConfig(ctx); err != nil {
 		utils.Fatalf("%v", err)
 	}
-    fmt.Println("-------createAccount-------------------439----")
 	cfg.Node.P2P = cfg.P2P
 	utils.SetNodeConfig(ctx, &cfg.Node, configDir)
 	scryptN, scryptP, keydir, err := cfg.Node.AccountConfig()
-
 	address, err := keystore.StoreKeySm2(keydir, password, scryptN, scryptP)
 	if err != nil {
 		utils.Fatalf("Failed to create account: %v", err)
@@ -519,9 +517,9 @@ func accountDumpKey(ctx *cli.Context) error {
 	prvKey, _ := ks.DumpKey(account, pwd)
 	wif := crypto.ToWIF(prvKey)
 	fmt.Printf("Your private key hex is : {%x}, WIF is {%s}\n", prvKey, wif)
-	pK, _ := crypto.ToECDSA(prvKey)
-	pubBytes := crypto.CompressPubkey(&pK.PublicKey)
-	fmt.Printf("Compressed public key hex is {%x}", pubBytes)
+	//pK, _ := crypto.ToECDSA(prvKey)
+	//pubBytes := crypto.CompressPubkey(&pK.PublicKey)
+	//fmt.Printf("Compressed public key hex is {%x}", pubBytes)
 	return nil
 }
 
@@ -737,3 +735,5 @@ func accountImport(ctx *cli.Context) error {
 	fmt.Printf("Address: {%s}\n", acct.Address)
 	return nil
 }
+
+

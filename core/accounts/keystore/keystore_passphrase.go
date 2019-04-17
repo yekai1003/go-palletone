@@ -95,7 +95,10 @@ func (ks keyStorePassphrase) GetKey(addr common.Address, filename, auth string) 
 }
 func (ks keyStorePassphrase) GetKeySm2(addr common.Address, filename, auth string) (*sm2.PrivateKey, error) {
 	// Load the key from the keystore and decrypt its contents
+	fmt.Println("GetKeySm2------98---filename---------",filename)
+	fmt.Println("GetKeySm2------99---auth---------",auth)
 	privateKey, e := sm2.ReadPrivateKeyFromPem(filename, []byte(auth))
+	fmt.Println("GetKeySm2------100-----privateKey-------",privateKey)
 	if e != nil{
 		fmt.Println("failed to read privateKey ！！！")
 		return nil,nil

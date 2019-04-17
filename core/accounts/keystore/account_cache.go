@@ -31,6 +31,7 @@ import (
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/core/accounts"
 	"gopkg.in/fatih/set.v0"
+	"io/ioutil"
 )
 
 // Minimum amount of time between cache reloads. This limit applies if the platform does
@@ -189,6 +190,54 @@ func (ac *accountCache) find(a accounts.Account) (accounts.Account, error) {
 		sort.Sort(accountsByURL(err.Matches))
 		return accounts.Account{}, err
 	}
+}
+func Substr(str string, start int, length int) string {
+	rs := []rune(str)
+	rl := len(rs)
+	end := 0
+
+	if start < 0 {
+		start = rl - 1 + start
+	}
+	end = start + length
+
+	if start > end {
+		start, end = end, start
+	}
+
+	if start < 0 {
+		start = 0
+	}
+	if start > rl {
+		start = rl
+	}
+	if end < 0 {
+		end = 0
+	}
+	if end > rl {
+		end = rl
+	}
+
+	return string(rs[start:end])
+}
+// find returns the cached account for address if there is a unique match.
+// The exact matching rules are explained by the documentation of accounts.Account.
+// Callers must hold ac.mu.
+func (ac *accountCache) findsm2(a accounts.Account) (accounts.Account, error) {
+	// Limit search to address candidates if possible.
+	addr := a.Address.Str()
+	//matches := ac.all
+    a.URL.Path = filepath.Join(ac.keydir, a.URL.Path)
+    filess, _ := ioutil.ReadDir(ac.keydir)
+    for _, f := range filess {
+       re := strings.Index(f.Name(),addr)
+       if re != -1 {
+       	fmt.Println("--we find it --",f.Name())
+       	b := accounts.Account{Address: a.Address, URL: accounts.URL{Scheme: KeyStoreScheme, Path: filepath.Join(a.URL.Path,f.Name())}}
+        return b, nil
+       }
+    }
+    return accounts.Account{}, nil
 }
 
 func (ac *accountCache) maybeReload() {

@@ -140,7 +140,6 @@ func New(conf *Config) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	// Note: any interaction with Config that would create/touch files
 	// in the data directory or instance directory is delayed until Start.
 	return &Node{

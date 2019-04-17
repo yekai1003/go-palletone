@@ -19,7 +19,7 @@ func TestSimpleSignHash(t *testing.T) {
 	privateKey := "L3vhqkbATXGc4o7VTG1mT7z1gDEFn1QmVwtxd4kWL9mMJevWnzwo"
 	// privateKeyBytes := hexutil.MustDecode(privateKey)
 	prvKey, _ := crypto.FromWIF(privateKey)
-    
+
 	//signB, _ := hexutil.Decode(sign)
 	signature, _ := crypto.Sign(hash.Bytes(), prvKey)
 	t.Log("Signature is: " + hexutil.Encode(signature))
@@ -47,9 +47,9 @@ func TestSignHash(t *testing.T) {
 		//hash := common.HexToHash(input.HashForSign)
         hash := common.HexToHash("21d0b6842031caea51e4c7a7ebb373ccadee3f47b839f6da2c44032e6d6e5ce1")
 		privateKey := "L4WY61XDnu8gRGDDDV3cHRwt5EM9TRKMnECB9Luu1sUPuxGXJCUZ"
+		//privateKey := "L3vhqkbATXGc4o7VTG1mT7z1gDEFn1QmVwtxd4kWL9mMJevWnzwo"
 		prvKey, _ := crypto.FromWIF(privateKey)
 		signature, _ := crypto.Sign(hash.Bytes(), prvKey)
-		fmt.Println("signature is ",signature)
 
 		t.Log("Signature is: " + hexutil.Encode(signature))
 		pubKey := crypto.FromECDSAPub(&prvKey.PublicKey)

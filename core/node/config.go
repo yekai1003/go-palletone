@@ -413,9 +413,12 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 		return nil, "", err
 	}
 	// Assemble the account manager and supported backends
+	fmt.Println("core config.go-----416-----")
 	backends := []accounts.Backend{
 		keystore.NewKeyStore(keydir, scryptN, scryptP),
+		keystore.NewKeyStoreSm2(keydir, scryptN, scryptP),
 	}
+	fmt.Println("core config.go-----421-----")
 	/*
 		if !conf.NoUSB {
 			// Start a USB hub for Ledger hardware wallets

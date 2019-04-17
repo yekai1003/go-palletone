@@ -104,7 +104,13 @@ func NewKeyStore(keydir string, scryptN, scryptP int) *KeyStore {
 	ks.init(keydir)
 	return ks
 }
-
+// NewKeyStore creates a keystore for the given directory.
+func NewKeyStoreSm2(keydir string, scryptN, scryptP int) *Sm2KeyStore {
+	keydir, _ = filepath.Abs(keydir)
+	ks := &Sm2KeyStore{storage: &keyStorePassphrase{keydir, scryptN, scryptP}}
+	ks.init(keydir)
+	return ks
+}
 // NewPlaintextKeyStore creates a keystore for the given directory.
 // Deprecated: Use NewKeyStore.
 func NewPlaintextKeyStore(keydir string) *KeyStore {
@@ -136,7 +142,27 @@ func (ks *KeyStore) init(keydir string) {
 		ks.wallets[i] = &keystoreWallet{account: accs[i], keystore: ks}
 	}
 }
+func (ks *Sm2KeyStore) init(keydir string) {
+	// Lock the mutex since the account cache might call back with events
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
 
+	// Initialize the set of unlocked keys and the account cache
+	ks.sm2unlocked = make(map[common.Address]*sm2unlocked)
+	ks.cache, ks.changes = newAccountCache(keydir)
+	// TODO: In order for this finalizer to work, there must be no references
+	// to ks. addressCache doesn't keep a reference but unlocked keys do,
+	// so the finalizer will not trigger until all timed unlocks have expired.
+	runtime.SetFinalizer(ks, func(m *Sm2KeyStore) {
+		m.cache.close()
+	})
+	// Create the initial list of wallets from the cache
+	accs := ks.cache.accounts()
+	ks.wallets = make([]accounts.Wallet, len(accs))
+	for i := 0; i < len(accs); i++ {
+		ks.wallets[i] = &sm2keystoreWallet{account: accs[i], keystore: ks}
+	}
+}
 // Wallets implements accounts.Backend, returning all single-key wallets from the
 // keystore directory.
 func (ks *KeyStore) Wallets() []accounts.Wallet {
@@ -629,9 +655,10 @@ func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 }
 // Find resolves the given account into a unique entry in the keystore.
 func (ks *Sm2KeyStore) Find(a accounts.Account) (accounts.Account, error) {
+	//report err when find
 	ks.cache.maybeReload()
 	ks.cache.mu.Lock()
-	a, err := ks.cache.find(a)
+	a, err := ks.cache.findsm2(a)
 	ks.cache.mu.Unlock()
 	return a, err
 }
@@ -646,6 +673,7 @@ func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.A
 
 func (ks *Sm2KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *sm2.PrivateKey, error) {
 	a, err := ks.Find(a)
+	//b := accounts.Account{Address: a.Address, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(a.Address))}}
 	if err != nil {
 		return a, nil, err
 	}
@@ -820,6 +848,15 @@ func (ks *Sm2KeyStore) Update(a accounts.Account, passphrase, newPassphrase stri
 	}
 	return ks.storage.StoreKeySm2(a.URL.Path, key, newPassphrase)
 }
+
+/*func (ks Sm2KeyStore) JoinPath(filename string) string {
+	if filepath.IsAbs(filename) {
+		return filename
+	} else {
+		return filepath.Join(ks.keysDirPath, filename)
+	}
+}*/
+
 // ZeroKey zeroes a private key in memory.
 func ZeroKey(k *ecdsa.PrivateKey) {
 	b := k.D.Bits()
