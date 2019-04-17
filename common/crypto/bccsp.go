@@ -51,6 +51,7 @@ var cacheAddrPubKey map[common.Address]bccsp.Key
 func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 	log.Debug("Try to initial bccsp instance.")
 	cacheAddrPriKey = make(map[common.Address]bccsp.Key)
+	cacheAddrPubKey = make(map[common.Address]bccsp.Key)
 	f := &factory.SWFactory{}
 	opts := &factory.FactoryOpts{
 		SwOpts: &factory.SwOpts{
