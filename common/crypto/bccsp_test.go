@@ -141,7 +141,7 @@ func TestS256(t *testing.T) {
 	pubKeyB, _ := pubKey.Bytes()
 	t.Logf("PubKey:%x,len:%d,SKI:%x", pubKeyB, len(pubKeyB), pubKey.SKI())
 	signature, err := csp.Sign(privKey, hash1, nil)
-	t.Logf("Signature:%x", signature)
+	t.Logf("Signature:%x,len:%d", signature, len(signature))
 	valid, err := csp.Verify(pubKey, signature, hash1, nil)
 	if err != nil {
 		t.Fatalf("Failed verifying ECDSA signature [%s]", err)

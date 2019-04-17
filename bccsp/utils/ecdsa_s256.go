@@ -1,19 +1,21 @@
 package utils
 
 import (
-	"math/big"
 	"crypto/ecdsa"
 	"github.com/btcsuite/btcutil/base58"
+	"math/big"
 
 	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/palletone/go-palletone/common/math"
 )
+
 var (
 	secp256k1_N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
 	secp256k1_halfN = new(big.Int).Div(secp256k1_N, big.NewInt(2))
 )
+
 // ToECDSA creates a private key with the given D value.
 func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
 	return toECDSA(d, true)
@@ -85,3 +87,19 @@ func FromECDSA(priv *ecdsa.PrivateKey) []byte {
 	return math.PaddedBigBytes(priv.D, priv.Params().BitSize/8)
 }
 
+// DecompressPubkey parses a public key in the 33-byte compressed format.
+func DecompressPubkey(pubkey []byte) (*ecdsa.PublicKey, error) {
+	if len(pubkey) != 33 {
+		return nil, errors.New("invalid compressed public key length")
+	}
+	key, err := btcec.ParsePubKey(pubkey, btcec.S256())
+	if err != nil {
+		return nil, err
+	}
+	return key.ToECDSA(), nil
+}
+
+// CompressPubkey encodes a public key to the 33-byte compressed format.
+func CompressPubkey(pubkey *ecdsa.PublicKey) []byte {
+	return (*btcec.PublicKey)(pubkey).SerializeCompressed()
+}
