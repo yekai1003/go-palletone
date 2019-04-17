@@ -248,6 +248,9 @@ func NewProtocolManager(mode downloader.SyncMode, networkId uint64, gasToken mod
 func (pm *ProtocolManager) newFetcher() *fetcher.Fetcher {
 	validatorFn := func(unit *modules.Unit) error {
 		//return dagerrors.ErrFutureBlock
+		hash := unit.Hash()
+		log.Debugf("Importing propagated block insert DAG Enter ValidateUnitExceptGroupSig, unit: %s", hash.String())
+		defer log.Debugf("Importing propagated block insert DAG End ValidateUnitExceptGroupSig, unit: %s", hash.String())
 		verr := pm.dag.ValidateUnitExceptGroupSig(unit)
 		if verr != nil && !validator.IsOrphanError(verr) {
 			return dagerrors.ErrFutureBlock

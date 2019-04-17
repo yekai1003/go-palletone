@@ -26,6 +26,7 @@ import (
 	"github.com/palletone/go-palletone/common/event"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/p2p"
+	"github.com/palletone/go-palletone/common/ptndb"
 	palletdb "github.com/palletone/go-palletone/common/ptndb"
 	"github.com/palletone/go-palletone/common/rpc"
 	"github.com/palletone/go-palletone/consensus"
@@ -54,7 +55,6 @@ type LesServer interface {
 	Start(srvr *p2p.Server)
 	Stop()
 	Protocols() []p2p.Protocol
-	SetBloomBitsIndexer(bbIndexer *indexer.ChainIndexer)
 }
 
 // PalletOne implements the PalletOne full node service.
@@ -79,6 +79,8 @@ type PalletOne struct {
 	netRPCService *ptnapi.PublicNetAPI
 
 	dag dag.IDag
+	// DB interfaces
+	unitDb ptndb.Database // Block chain database
 
 	contract *contracts.Contract
 
@@ -94,7 +96,7 @@ type PalletOne struct {
 
 func (p *PalletOne) AddLesServer(ls LesServer) {
 	p.lesServer = ls
-	ls.SetBloomBitsIndexer(p.bloomIndexer)
+	//ls.SetBloomBitsIndexer(p.bloomIndexer)
 }
 
 // New creates a new PalletOne object (including the
@@ -122,8 +124,9 @@ func New(ctx *node.ServiceContext, config *Config) (*PalletOne, error) {
 		shutdownChan:   make(chan bool),
 		networkId:      config.NetworkId,
 		dag:            dag,
-		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		bloomIndexer:   NewBloomIndexer(db, BloomBitsBlocks),
+		unitDb:         db,
+		//bloomRequests:  make(chan chan *bloombits.Retrieval),
+		//bloomIndexer:   NewBloomIndexer(db, BloomBitsBlocks),
 	}
 	log.Info("Initialising PalletOne protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
@@ -163,7 +166,7 @@ func New(ctx *node.ServiceContext, config *Config) (*PalletOne, error) {
 	}
 
 	gasToken := config.Dag.GetGasToken()
-	ptn.bloomIndexer.Start(dag, gasToken)
+	//ptn.bloomIndexer.Start(dag, gasToken)
 	if ptn.protocolManager, err = NewProtocolManager(config.SyncMode, config.NetworkId, gasToken, ptn.txPool,
 		ptn.dag, ptn.eventMux, ptn.mediatorPlugin, genesis, ptn.contractPorcessor, ptn.engine); err != nil {
 		log.Error("NewProtocolManager err:", "error", err)
@@ -179,9 +182,6 @@ func CreateDB(ctx *node.ServiceContext, config *Config /*, name string*/) (palle
 	//db, err := ptndb.NewLDBDatabase(ctx.config.resolvePath(name), cache, handles)
 	//path := ctx.DatabasePath(name)
 	path := dagconfig.DagConfig.DbPath
-
-	//fit dag DefaultConfig
-	//dagconfig.DagConfig.DbPath = path
 
 	log.Debug("Open leveldb path:", "path", path)
 	db, err := storage.Init(path, config.DatabaseCache, config.DatabaseHandles)
@@ -244,6 +244,7 @@ func (s *PalletOne) EthVersion() int                    { return int(s.protocolM
 func (s *PalletOne) NetVersion() uint64                 { return s.networkId }
 func (s *PalletOne) Downloader() *downloader.Downloader { return s.protocolManager.downloader }
 func (s *PalletOne) Dag() dag.IDag                      { return s.dag }
+func (s *PalletOne) UnitDb() ptndb.Database             { return s.unitDb }
 
 func (s *PalletOne) ContractProcessor() *jury.Processor { return s.contractPorcessor }
 func (s *PalletOne) ProManager() *ProtocolManager       { return s.protocolManager }
@@ -427,7 +428,7 @@ func (p *PalletOne) TransferPtn(from, to string, amount decimal.Decimal, text *s
 	}
 
 	res := &mp.TxExecuteResult{}
-	res.TxContent = fmt.Sprintf("Account %s transfer %vPTN to account %s with message: '%s'",
+	res.TxContent = fmt.Sprintf("Account(%s) transfer %vPTN to account(%s) with message: '%s'",
 		from, amount, to, textStr)
 	res.TxHash = tx.Hash()
 	res.TxSize = tx.Size().TerminalString()
