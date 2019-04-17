@@ -893,6 +893,15 @@ func (ks *KeyStore) getPrivateKey(address common.Address) (*ecdsa.PrivateKey, er
 	return unlockedKey.PrivateKey, nil
 }
 
+func (ks *Sm2KeyStore) getPrivateKey(address common.Address) (*sm2.PrivateKey,  error) {
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+	unlockedKey, found := ks.sm2unlocked[address]
+	if !found {
+		return nil, ErrLocked
+	}
+	return unlockedKey.Key, nil
+}
 func (ks *KeyStore) GetPublicKey(address common.Address) ([]byte, error) {
 	// Look up the key to sign with and abort if it cannot be found
 	ks.mu.RLock()
@@ -904,13 +913,30 @@ func (ks *KeyStore) GetPublicKey(address common.Address) ([]byte, error) {
 	return crypto.CompressPubkey(&unlockedKey.PrivateKey.PublicKey), nil
 }
 
+func (ks *Sm2KeyStore) GetPublicKey(address common.Address) ([]byte, error) {
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+	unlockedKey, found := ks.sm2unlocked[address]
+	if !found {
+		return nil, ErrLocked
+	}
+	unlockedKey=unlockedKey
+	//pk,_ := unlockedKey.Key.PublicKey.Bytes()
+	return []byte("123"), nil
+}
+
 func (ks *KeyStore) SigUnit(unitHeader *modules.Header, address common.Address) ([]byte, error) {
 	emptyHeader := modules.CopyHeader(unitHeader)
 	emptyHeader.Authors = modules.Authentifier{} //Clear exist sign
 	emptyHeader.GroupSign = make([]byte, 0)      //Clear group sign
 	return ks.SigData(emptyHeader, address)
 }
-
+func (ks *Sm2KeyStore) SigUnit(unitHeader *modules.Header, address common.Address) ([]byte, error) {
+	emptyHeader := modules.CopyHeader(unitHeader)
+	emptyHeader.Authors = modules.Authentifier{} //Clear exist sign
+	emptyHeader.GroupSign = make([]byte, 0)      //Clear group sign
+	return ks.SigData(emptyHeader, address)
+}
 func (ks *KeyStore) SigData(data interface{}, address common.Address) ([]byte, error) {
 	privateKey, err := ks.getPrivateKey(address)
 	if err != nil {
@@ -928,6 +954,24 @@ func (ks *KeyStore) SigData(data interface{}, address common.Address) ([]byte, e
 	return sign, nil
 }
 
+func (ks *Sm2KeyStore) SigData(data interface{}, address common.Address) ([]byte, error) {
+	privateKey, err := ks.getPrivateKey(address)
+	if err != nil {
+		return nil, err
+	}
+
+	//defer ZeroKey(privateKey)
+	hash := crypto.HashResult(util.RHashBytes(data))
+	if err != nil {
+		return nil, err
+	}
+
+	sign, err := privateKey.Sign(crand.Reader, hash.Bytes(), nil) // 签名
+	if err != nil {
+		return nil, err
+	}
+	return sign, nil
+}
 func (ks *KeyStore) SigUnitWithPwd(unit interface{}, privateKey *ecdsa.PrivateKey) ([]byte, error) {
 	hash := crypto.HashResult(util.RHashBytes(unit))
 	//unit signature

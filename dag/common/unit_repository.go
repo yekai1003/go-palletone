@@ -355,7 +355,36 @@ func GetUnitWithSig(unit *modules.Unit, ks *keystore.KeyStore, signer common.Add
 	// unit.UnitHeader.GroupSign = sign
 	return unit, nil
 }
-
+func GetUnitWithSigSm2(unit *modules.Unit, ks *keystore.Sm2KeyStore, signer common.Address) (*modules.Unit, error) {
+	// signature unit: only sign header data(without witness and authors fields)
+	sign, err1 := ks.SigUnit(unit.UnitHeader, signer)
+	if err1 != nil {
+		msg := fmt.Sprintf("Failed to write genesis block:%v", err1.Error())
+		log.Error(msg)
+		return unit, err1
+	}
+	pubKey, err := ks.GetPublicKey(signer)
+	if err != nil {
+		return nil, err
+	}
+	//r := sign[:32]
+	//s := sign[32:64]
+	//v := sign[64:]
+	//if len(v) != 1 {
+	//	return unit, errors.New("error.")
+	//}
+	log.Debugf("Unit[%s] signed by address:%s", unit.Hash().String(), signer.String())
+	unit.UnitHeader.Authors = modules.Authentifier{
+		PubKey:    pubKey,
+		Signature: sign,
+	}
+	// to set witness list, should be creator himself
+	// var authentifier modules.Authentifier
+	// authentifier.Address = signer
+	// unit.UnitHeader.Witness = append(unit.UnitHeader.Witness, &authentifier)
+	// unit.UnitHeader.GroupSign = sign
+	return unit, nil
+}
 /**
 创建单元
 create common unit

@@ -85,7 +85,37 @@ func SetupGenesisUnit(genesis *core.Genesis, ks *keystore.KeyStore, account acco
 	//}
 	return unit, nil
 }
+func SetupGenesisUnitSm2(genesis *core.Genesis, ks *keystore.Sm2KeyStore, account accounts.Account) (*modules.Unit, error) {
 
+	//var unitRep dagCommon.IUnitRepository
+	//unitRep = dagCommon.NewUnitRepository4Db(db)
+	//genesisUnit, err := dag.GetGenesisUnit(0)
+	//if err != nil && err.Error() != errors.ErrNotFound.Error() {
+	//	log.Info("get genesis error", "error", err)
+	//	return nil, err
+	//}
+	// check genesis unit existing
+	//if genesisUnit != nil {
+	//	return nil, fmt.Errorf("Genesis unit(%s) has been created.", genesisUnit.UnitHash.String())
+	//}
+	unit, err := sm2setupGenesisUnit(genesis, ks)
+	if err != nil {
+		return unit, err
+	}
+
+	// modify by Albert·Gou
+	unit, err = dagCommon.GetUnitWithSigSm2(unit, ks, account.Address)
+	if err != nil {
+		return unit, err
+	}
+
+	// to save unit in db
+	//if err := CommitDB(dag, unit, true); err != nil {
+	//	log.Error("Commit genesis unit to db:", "error", err.Error())
+	//	return unit, err
+	//}
+	return unit, nil
+}
 func setupGenesisUnit(genesis *core.Genesis, ks *keystore.KeyStore) (*modules.Unit, error) {
 
 	if genesis == nil {
@@ -95,6 +125,23 @@ func setupGenesisUnit(genesis *core.Genesis, ks *keystore.KeyStore) (*modules.Un
 		log.Info("Writing custom genesis block")
 	}
 	txs, asset := GetGensisTransctions(ks, genesis)
+	log.Info("-> Genesis transactions:")
+	for i, tx := range txs {
+		msg := fmt.Sprintf("Tx[%d]: %s\n", i, tx.Hash().String())
+		log.Info(msg)
+	}
+	//return modules.NewGenesisUnit(genesis, txs)
+	return dagCommon.NewGenesisUnit(txs, genesis.InitialTimestamp, asset, genesis.ParentUnitHeight, genesis.ParentUnitHash)
+}
+func sm2setupGenesisUnit(genesis *core.Genesis, ks *keystore.Sm2KeyStore) (*modules.Unit, error) {
+
+	if genesis == nil {
+		log.Info("Writing default main-net genesis block")
+		genesis = DefaultGenesisBlock()
+	} else {
+		log.Info("Writing custom genesis block")
+	}
+	txs, asset := GetGensisTransctionsSm2(ks, genesis)
 	log.Info("-> Genesis transactions:")
 	for i, tx := range txs {
 		msg := fmt.Sprintf("Tx[%d]: %s\n", i, tx.Hash().String())
@@ -136,6 +183,65 @@ func GetGensisTransctions(ks *keystore.KeyStore, genesis *core.Genesis) (modules
 	//	Extra: extra, // save asset info
 	//}
 	// generate p2pkh bytes
+	addr, _ := common.StringToAddress(holder.String())
+	pkscript := tokenengine.GenerateP2PKHLockScript(addr.Bytes())
+	asset, _ := modules.StringToAsset(genesis.GasToken)
+	txout := &modules.Output{
+		Value:    genesis.GetTokenAmount(),
+		Asset:    asset,
+		PkScript: pkscript,
+	}
+	pay := &modules.PaymentPayload{
+		//Inputs:  []*modules.Input{txin},
+		Outputs: []*modules.Output{txout},
+	}
+	msg0 := &modules.Message{
+		App:     modules.APP_PAYMENT,
+		Payload: pay,
+	}
+	// step2 generate text payload
+	msg1 := &modules.Message{
+		App:     modules.APP_DATA,
+		Payload: &modules.DataPayload{MainData: []byte("Genesis Text"), ExtraData: []byte(genesis.Text)},
+	}
+	tx := &modules.Transaction{
+		TxMessages: []*modules.Message{msg0, msg1},
+	}
+	// step3, generate global config payload message
+	configPayloads, err := dagCommon.GenGenesisConfigPayload(genesis, asset)
+	if err != nil {
+		log.Error("Generate genesis unit config payload error.")
+		return nil, nil
+	}
+
+	for _, payload := range configPayloads {
+		newMsg := &modules.Message{
+			App:     modules.APP_CONTRACT_INVOKE,
+			Payload: payload,
+		}
+		tx.TxMessages = append(tx.TxMessages, newMsg)
+	}
+
+	// step4, generate inital mediator info payload
+	initialMediatorMsgs := dagCommon.GetInitialMediatorMsgs(genesis)
+	tx.TxMessages = append(tx.TxMessages, initialMediatorMsgs...)
+
+	// tx.CreationDate = tx.CreateDate()
+	//tx.TxHash = tx.Hash()
+
+	txs := []*modules.Transaction{tx}
+	return txs, asset
+}
+
+
+func GetGensisTransctionsSm2(ks *keystore.Sm2KeyStore, genesis *core.Genesis) (modules.Transactions, *modules.Asset) {
+	// step1, generate payment payload message: coin creation
+	holder, err := common.StringToAddress(genesis.TokenHolder)
+
+	if err != nil || holder.GetType() != common.PublicKeyHash {
+		log.Error("Genesis holder address is an invalid p2pkh address.")
+		return nil, nil
+	}
 	addr, _ := common.StringToAddress(holder.String())
 	pkscript := tokenengine.GenerateP2PKHLockScript(addr.Bytes())
 	asset, _ := modules.StringToAsset(genesis.GasToken)

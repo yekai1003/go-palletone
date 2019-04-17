@@ -120,10 +120,14 @@ func initGenesis(ctx *cli.Context) error {
 		return errors.New("leveldb init failed")
 	}
 	dag, _ := dag.NewDag4GenesisInit(Dbconn)
-	ks := node.GetKeyStore()
-	account, password := unlockAccount(nil, ks, genesis.TokenHolder, 0, nil)
+	//ks := node.GetKeyStore()
+	ks := node.GetSm2KeyStore()
+	//account, password := unlockAccount(nil, ks, genesis.TokenHolder, 0, nil)
+    account, password := unlocksm2Account(nil, ks, genesis.TokenHolder, 0, nil)
 
-	err = ks.Unlock(account, password)
+	//err = ks.Unlock(account, password)
+	err = ks.UnlockSm2(account, password)
+	
 	if err != nil {
 		utils.Fatalf("Failed to unlock account: %v, address: %v", err, account.Address.Str())
 		return err
@@ -133,7 +137,7 @@ func initGenesis(ctx *cli.Context) error {
 		return errors.New("leveldb is not empty")
 	}
 	//将Genesis对象转换为一个Unit
-	unit, err := gen.SetupGenesisUnit(genesis, ks, account)
+	unit, err := gen.SetupGenesisUnitSm2(genesis, ks, account)
 	if err != nil {
 		utils.Fatalf("Failed to generate genesis unit: %v", err)
 		return err
