@@ -132,7 +132,7 @@ func TestS256(t *testing.T) {
 	assert.Nil(t, err)
 	getPrivKey, err := csp.GetKey(privKey.SKI())
 	assert.Equal(t, privKey, getPrivKey)
-	//TODO Devin GetKey must need support S256
+
 	privKeyB, err := privKey.Bytes()
 
 	assert.Nil(t, err)
@@ -160,7 +160,7 @@ func TestS256(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	err := Init(HashType_SHA3_256, CryptoType_ECDSA_P256, os.TempDir())
+	_, err := Init(HashType_SHA3_256, CryptoType_ECDSA_P256, os.TempDir())
 	if err != nil {
 		log.Error(err.Error())
 	}

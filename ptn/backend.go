@@ -23,6 +23,7 @@ import (
 
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/bloombits"
+	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/event"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/p2p"
@@ -130,6 +131,7 @@ func New(ctx *node.ServiceContext, config *Config) (*PalletOne, error) {
 	}
 	log.Info("Initialising PalletOne protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
+	crypto.Init()
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = ctx.ResolvePath(config.TxPool.Journal)
 	}
@@ -323,6 +325,7 @@ func (s *PalletOne) Stop() error {
 func (p *PalletOne) GetKeyStore() *keystore.KeyStore {
 	return p.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 }
+
 // @author Albert·Gou
 func (p *PalletOne) GetSm2KeyStore() *keystore.Sm2KeyStore {
 	return p.AccountManager().Backends(keystore.KeyStoreTypeSm2)[0].(*keystore.Sm2KeyStore)
