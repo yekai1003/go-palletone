@@ -147,7 +147,7 @@ type Backend interface {
 	//SignAndSendTransaction(addr common.Address, tx *modules.Transaction) error
 	TransferPtn(from, to string, amount decimal.Decimal, text *string) (*mp.TxExecuteResult, error)
 	GetKeyStore() *keystore.KeyStore
-	GetSm2KeyStore() *keystore.Sm2KeyStore
+	//GetSm2KeyStore() *keystore.Sm2KeyStore
 
 	// get tx hash by req id
 	GetTxHashByReqId(reqid common.Hash) (common.Hash, error)

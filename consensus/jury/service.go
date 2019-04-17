@@ -49,7 +49,7 @@ const (
 
 type PalletOne interface {
 	GetKeyStore() *keystore.KeyStore
-	GetSm2KeyStore() *keystore.Sm2KeyStore
+	//GetSm2KeyStore() *keystore.Sm2KeyStore
 	TxPool() txspool.ITxPool
 
 	MockContractLocalSend(event ContractEvent)
@@ -634,7 +634,7 @@ func (p *Processor) signAndExecute(contractId common.Address, from common.Addres
 		if contractId == (common.Address{}) { //deploy
 			cId := common.NewAddress(common.BytesToAddress(reqId.Bytes()).Bytes(), common.ContractHash)
 			if ele, ok := p.lockArf[cId]; !ok || len(ele) < p.electionNum {
-				p.lockArf[cId] = []ElectionInf{} //清空
+				p.lockArf[cId] = []ElectionInf{}                               //清空
 				if err = p.ElectionRequest(reqId, time.Second*5); err != nil { //todo ,Single-threaded timeout wait mode
 					return common.Hash{}, nil, err
 				}

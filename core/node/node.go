@@ -710,10 +710,11 @@ func (n *Node) apis() []rpc.API {
 func (n *Node) GetKeyStore() *keystore.KeyStore {
 	return n.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 }
+
 // @author zhiyuan.wu
-func (n *Node) GetSm2KeyStore() *keystore.Sm2KeyStore {
-	return n.AccountManager().Backends(keystore.KeyStoreTypeSm2)[0].(*keystore.Sm2KeyStore)
-}
+//func (n *Node) GetSm2KeyStore() *keystore.Sm2KeyStore {
+//	return n.AccountManager().Backends(keystore.KeyStoreTypeSm2)[0].(*keystore.Sm2KeyStore)
+//}
 
 //func (n *Node) SetDbPath(path string) {
 //	n.dbpath = path

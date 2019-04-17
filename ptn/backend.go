@@ -327,9 +327,9 @@ func (p *PalletOne) GetKeyStore() *keystore.KeyStore {
 }
 
 // @author Albert·Gou
-func (p *PalletOne) GetSm2KeyStore() *keystore.Sm2KeyStore {
-	return p.AccountManager().Backends(keystore.KeyStoreTypeSm2)[0].(*keystore.Sm2KeyStore)
-}
+//func (p *PalletOne) GetSm2KeyStore() *keystore.Sm2KeyStore {
+//	return p.AccountManager().Backends(keystore.KeyStoreTypeSm2)[0].(*keystore.Sm2KeyStore)
+//}
 func (p *PalletOne) SignGenericTransaction(from common.Address, tx *modules.Transaction) (*modules.Transaction, error) {
 	inputpoints := make(map[modules.OutPoint][]byte)
 

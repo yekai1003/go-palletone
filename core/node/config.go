@@ -416,7 +416,7 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 	fmt.Println("core config.go-----416-----")
 	backends := []accounts.Backend{
 		keystore.NewKeyStore(keydir, scryptN, scryptP),
-		keystore.NewKeyStoreSm2(keydir, scryptN, scryptP),
+		//keystore.NewKeyStoreSm2(keydir, scryptN, scryptP),
 	}
 	fmt.Println("core config.go-----421-----")
 	/*

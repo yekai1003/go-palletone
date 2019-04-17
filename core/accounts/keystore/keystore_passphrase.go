@@ -43,7 +43,6 @@ import (
 	// "github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/math"
 	"github.com/pborman/uuid"
-	"github.com/tjfoc/gmsm/sm2"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/scrypt"
 )
@@ -93,16 +92,6 @@ func (ks keyStorePassphrase) GetKey(addr common.Address, filename, auth string) 
 	}
 	return key, nil
 }
-func (ks keyStorePassphrase) GetKeySm2(addr common.Address, filename, auth string) (*sm2.PrivateKey, error) {
-	// Load the key from the keystore and decrypt its contents
-	
-	privateKey, e := sm2.ReadPrivateKeyFromPem(filename, []byte(auth))
-	if e != nil {
-		fmt.Println("failed to read privateKey ！！！")
-		return nil, nil
-	}
-	return privateKey, nil
-}
 
 // StoreKey generates a key, encrypts with 'auth' and stores in the given directory
 func StoreKey(dir, auth string, scryptN, scryptP int) (common.Address, error) {
@@ -112,31 +101,12 @@ func StoreKey(dir, auth string, scryptN, scryptP int) (common.Address, error) {
 	return a.Address, err
 }
 
-// StoreKey generates a key, encrypts with 'auth' and stores in the given directory
-func StoreKeySm2(dir, auth string, scryptN, scryptP int) (common.Address, error) {
-	fmt.Println("-------StoreKeySm2-------------------114----")
-	_, a, err := sm2storeNewKey(&keyStorePassphrase{dir, scryptN, scryptP}, crand.Reader, auth)
-	// log.Debug("Dir: " + dir + " Auth: " + auth + " scryptN: " + strconv.Itoa(scryptN) + " scryptP: " + strconv.Itoa(scryptP))
-	// log.Debug("Address:" + a.Address.Str())
-	return a.Address, err
-}
 func (ks keyStorePassphrase) StoreKey(filename string, key *Key, auth string) error {
 	keyjson, err := EncryptKey(key, auth, ks.scryptN, ks.scryptP)
 	if err != nil {
 		return err
 	}
 	return writeKeyFile(filename, keyjson)
-}
-func (ks keyStorePassphrase) StoreKeySm2(filename string, key *sm2.PrivateKey, auth string) error {
-
-	fmt.Println("------keyStorePassphrase-StoreKeySm2-------------------129----")
-	fmt.Println("filename is ", filename)
-	_, err := sm2.WritePrivateKeytoPem(filename, key, []byte(auth))
-	if err != nil {
-		fmt.Println("密钥对写入文件错误！！！")
-		return err
-	}
-	return err
 }
 
 func (ks keyStorePassphrase) JoinPath(filename string) string {
