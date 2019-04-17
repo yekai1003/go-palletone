@@ -45,6 +45,8 @@ type Key struct {
 	// we only store privkey as pubkey/address can be derived from it
 	// privkey in this struct is always in plaintext
 	PrivateKey *ecdsa.PrivateKey
+	PrivateKeyB []byte
+
 }
 
 type keyStore interface {

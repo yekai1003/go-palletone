@@ -100,9 +100,9 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) (*Crypt
 	if err != nil {
 		return nil, err
 	}
-	cryptoLib.keyImportOpt = &bccsp.ECDSAS256PublicKeyImportOpts{}
+	cryptoLib.keyImportOpt = &bccsp.ECDSAPrivateKeyImportOpts{}
 	if cryptoType == CryptoType_GM2_256 {
-		cryptoLib.keyImportOpt = &bccsp.GMSM2PublicKeyImportOpts{}
+		cryptoLib.keyImportOpt = &bccsp.GMSM2PrivateKeyImportOpts{}
 	}
 	myCryptoLib = cryptoLib
 	return cryptoLib, nil
@@ -160,27 +160,27 @@ func GenerateNewAddress() (common.Address, error) {
 	}
 	return myCryptoLib.GenerateNewAddress()
 }
-func (lib *CryptoLib) SignByAddress(hash []byte, addr common.Address) ([]byte, error) {
+func (lib *CryptoLib) SignByAddress(hash []byte, addr common.Address,password string) ([]byte, error) {
 	if key, ok := lib.cacheAddrPriKey[addr]; ok {
 		return lib.csp.Sign(key, hash, nil)
 	}
 	ski := addr.Bytes()
 	log.Debugf("Try get key by ski:%x", ski)
-	prvKey, err := lib.csp.GetKey(ski,&bccsp.ECDSAGetKeyOpts{Password:[]byte("1")})
+	prvKey, err := lib.csp.GetKey(ski,&bccsp.ECDSAGetKeyOpts{Password:[]byte(password)})
 	if err != nil {
 		return nil, err
 	}
 	lib.cacheAddrPriKey[addr] = prvKey
 	return lib.csp.Sign(prvKey, hash, nil)
 }
-func SignByAddress(hash []byte, addr common.Address) ([]byte, error) {
+func SignByAddress(hash []byte, addr common.Address,password string) ([]byte, error) {
 	if myCryptoLib == nil {
 		_, err := InitDefaultCryptoLib()
 		if err != nil {
 			return nil, err
 		}
 	}
-	return myCryptoLib.SignByAddress(hash, addr)
+	return myCryptoLib.SignByAddress(hash, addr,password)
 }
 func (lib *CryptoLib) GetPubKeyByAddress(addr common.Address) ([]byte, error) {
 	if pubkey, ok := lib.cacheAddrPubKey[addr]; ok {
@@ -229,4 +229,34 @@ func VerifySign(pubkey, hash, signature []byte) bool {
 		}
 	}
 	return myCryptoLib.VerifySign(pubkey, hash, signature)
+}
+func (lib *CryptoLib) GetKey(addr common.Address, password string) (bccsp.Key,error){
+	return lib.csp.GetKey(addr.Bytes(),&bccsp.ECDSAGetKeyOpts{Password:[]byte(password)})
+}
+func (lib *CryptoLib)StoreKey(privkey []byte, password string) error{
+
+	opt,ok:=lib.keyImportOpt.(*bccsp.ECDSAPrivateKeyImportOpts)
+	if ok{
+		opt.Password=[]byte(password)
+		opt.Temporary=false
+		lib.csp.KeyImport(privkey, opt)
+	}else{
+		opt,ok:=lib.keyImportOpt.(*bccsp.GMSM2PrivateKeyImportOpts)
+		if ok{
+			opt.Password=[]byte(password)
+			opt.Temporary=false
+			lib.csp.KeyImport(privkey, opt)
+		}
+	}
+	return nil
+
+}
+func GetInstance() *CryptoLib{
+	if myCryptoLib == nil {
+		_, err := InitDefaultCryptoLib()
+		if err != nil {
+			return nil
+		}
+	}
+	return myCryptoLib
 }

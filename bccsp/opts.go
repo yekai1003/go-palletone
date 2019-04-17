@@ -348,13 +348,16 @@ func (opts *GMSM4ImportKeyOpts) Ephemeral() bool {
 //GMSM2PrivateKeyImportOpts  实现  bccsp.KeyImportOpts 接口
 type GMSM2PrivateKeyImportOpts struct {
 	Temporary bool
+	Password []byte
 }
 
 // Algorithm returns the key importation algorithm identifier (to be used).
 func (opts *GMSM2PrivateKeyImportOpts) Algorithm() string {
 	return GMSM2
 }
-
+func (opts *GMSM2PrivateKeyImportOpts) ProtectPassword() []byte {
+	return opts.Password
+}
 // Ephemeral returns true if the key generated has to be ephemeral,
 // false otherwise.
 func (opts *GMSM2PrivateKeyImportOpts) Ephemeral() bool {
