@@ -45,8 +45,12 @@ const (
 var csp bccsp.BCCSP
 var hashOpt bccsp.HashOpts
 var keyImportOpt bccsp.KeyImportOpts
+var cacheAddrPriKey map[common.Address]bccsp.Key
+var cacheAddrPubKey map[common.Address]bccsp.Key
+
 func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 	log.Debug("Try to initial bccsp instance.")
+	cacheAddrPriKey = make(map[common.Address]bccsp.Key)
 	f := &factory.SWFactory{}
 	opts := &factory.FactoryOpts{
 		SwOpts: &factory.SwOpts{
@@ -57,7 +61,7 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 	}
 	var err error
 	hashOpt, err = bccsp.GetHashOpt("SHA3_256")
-	if err!=nil{
+	if err != nil {
 		return err
 	}
 	if hashType == HashType_GM3 {
@@ -75,9 +79,9 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) error {
 	if err != nil {
 		return err
 	}
-	keyImportOpt=&bccsp.ECDSAS256PublicKeyImportOpts{}
-	if cryptoType== CryptoType_GM2_256{
-	keyImportOpt=&bccsp.GMSM2PublicKeyImportOpts{}
+	keyImportOpt = &bccsp.ECDSAS256PublicKeyImportOpts{}
+	if cryptoType == CryptoType_GM2_256 {
+		keyImportOpt = &bccsp.GMSM2PublicKeyImportOpts{}
 	}
 	return nil
 }
@@ -86,33 +90,57 @@ func Hash(data []byte) common.Hash {
 	hf, _ := csp.GetHash(hashOpt)
 	hf.Write(data)
 	hash := hf.Sum(nil)
-	return common.BytesToHash( hash)
+	return common.BytesToHash(hash)
 }
-func GenerateNewAddress() (common.Address,error){
-	prvKey,err:= csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{Temporary:false})
-	if err!=nil{
-		return common.Address{},err
+func GenerateNewAddress() (common.Address, error) {
+	prvKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{Temporary: false})
+	if err != nil {
+		return common.Address{}, err
 	}
-	log.Debugf("Generate new key ski:%x",prvKey.SKI())
-	return common.NewAddress(prvKey.SKI(), common.PublicKeyHash),nil
+	addr := common.NewAddress(prvKey.SKI(), common.PublicKeyHash)
+	cacheAddrPriKey[addr] = prvKey
+	log.Debugf("Generate new key ski:%x", prvKey.SKI())
+	return addr, nil
 }
 
-func SignByAddress(hash []byte, addr common.Address ) ([]byte, error) {
-	ski:=addr.Bytes()
-	log.Debugf("Try get key by ski:%x",ski)
-	prvKey,err:=csp.GetKey(ski)
-	if err!=nil{
-		return nil,err
+func SignByAddress(hash []byte, addr common.Address) ([]byte, error) {
+	if key, ok := cacheAddrPriKey[addr]; ok {
+		return csp.Sign(key, hash, nil)
 	}
-	return csp.Sign(prvKey,hash,nil)
+	ski := addr.Bytes()
+	log.Debugf("Try get key by ski:%x", ski)
+	prvKey, err := csp.GetKey(ski)
+	if err != nil {
+		return nil, err
+	}
+	cacheAddrPriKey[addr] = prvKey
+	return csp.Sign(prvKey, hash, nil)
+}
+func GetPubKeyByAddress(addr common.Address) ([]byte, error) {
+	if pubkey, ok := cacheAddrPubKey[addr]; ok {
+		return pubkey.Bytes()
+	}
+	key, err := csp.GetKey(addr.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	var pubKey bccsp.Key
+	if key.Private() {
+		pubKey, _ = key.PublicKey()
+	} else {
+		pubKey = key
+	}
+
+	cacheAddrPubKey[addr] = pubKey
+	return pubKey.Bytes()
 }
 func VerifySign(pubkey, hash, signature []byte) bool {
-	pubKey,err:=csp.KeyImport(pubkey,&bccsp.ECDSAS256PublicKeyImportOpts{})
-	if err!=nil{
+	pubKey, err := csp.KeyImport(pubkey, &bccsp.ECDSAS256PublicKeyImportOpts{Temporary: true})
+	if err != nil {
 		return false
 	}
 	valid, err := csp.Verify(pubKey, signature, hash, nil)
-	if err!=nil {
+	if err != nil {
 		log.Errorf("Verify signature error:%s", err.Error())
 		return false
 	}

@@ -179,10 +179,28 @@ func BenchmarkHash(b *testing.B) {
 	}
 }
 func TestSignByAddress(t *testing.T) {
+	hash := []byte("Devin")
 	addr, err := GenerateNewAddress()
 	assert.Nil(t, err)
 	t.Logf("New Address:%s", addr.String())
-	signature, err := SignByAddress([]byte("Devin"), addr)
+	signature, err := SignByAddress(hash, addr)
 	assert.Nil(t, err)
 	t.Log("Signature", signature)
+
+	pubKey, err := GetPubKeyByAddress(addr)
+	assert.Nil(t, err)
+	t.Log("Public key:", pubKey)
+	pass := VerifySign(pubKey, hash, signature)
+	assert.True(t, pass)
+}
+func BenchmarkSignByAddress(b *testing.B) {
+	addr, err := GenerateNewAddress()
+	assert.Nil(b, err)
+	b.Logf("New Address:%s", addr.String())
+	for i := 0; i < b.N; i++ {
+		hash := []byte(fmt.Sprintf("Devin%d", i))
+		signature, err := SignByAddress(hash, addr)
+		assert.Nil(b, err)
+		b.Log("Signature", signature)
+	}
 }
