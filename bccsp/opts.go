@@ -95,11 +95,15 @@ const (
 // ECDSAKeyGenOpts contains options for ECDSA key generation.
 type ECDSAKeyGenOpts struct {
 	Temporary bool
+	Password  []byte
 }
 
 // Algorithm returns the key generation algorithm identifier (to be used).
 func (opts *ECDSAKeyGenOpts) Algorithm() string {
 	return ECDSA
+}
+func (opts *ECDSAKeyGenOpts) ProtectPassword() []byte {
+	return opts.Password
 }
 
 // Ephemeral returns true if the key to generate has to be ephemeral,
@@ -111,11 +115,15 @@ func (opts *ECDSAKeyGenOpts) Ephemeral() bool {
 // GMSM2KeyGenOpts contains options for GMSM2 key generation.
 type GMSM2KeyGenOpts struct {
 	Temporary bool
+	Password  []byte
 }
 
 // Algorithm returns the key generation algorithm identifier (to be used).
 func (opts *GMSM2KeyGenOpts) Algorithm() string {
 	return GMSM2
+}
+func (opts *GMSM2KeyGenOpts) ProtectPassword() []byte {
+	return opts.Password
 }
 
 // Ephemeral returns true if the key to generate has to be ephemeral,
@@ -160,16 +168,19 @@ func (opts *ECDSAPKIXPublicKeyImportOpts) Ephemeral() bool {
 // or PKCS#8 format.
 type ECDSAPrivateKeyImportOpts struct {
 	Temporary bool
-	Format ECDSAPrivateKeyFormat
+	Format    ECDSAPrivateKeyFormat
 }
 type ECDSAPrivateKeyFormat byte
-const (ECDSAPrivateKeyFormat_WIF ECDSAPrivateKeyFormat=iota
+
+const (
+	ECDSAPrivateKeyFormat_WIF ECDSAPrivateKeyFormat = iota
 	ECDSAPrivateKeyFormat_Hex
 	ECDSAPrivateKeyFormat_DER
 	ECDSAPrivateKeyFormat_KeyStoreFile
 	ECDSAPrivateKeyFormat_Mnemonic //助记词
 
 )
+
 // Algorithm returns the key importation algorithm identifier (to be used).
 func (opts *ECDSAPrivateKeyImportOpts) Algorithm() string {
 	//return ECDSA

@@ -53,6 +53,7 @@ type KeyGenOpts interface {
 	// Ephemeral returns true if the key to generate has to be ephemeral,
 	// false otherwise.
 	Ephemeral() bool
+	ProtectPassword() []byte
 }
 
 // KeyDerivOpts contains options for key-derivation with a CSP.

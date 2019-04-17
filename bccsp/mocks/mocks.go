@@ -184,6 +184,9 @@ func (ks *KeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 func (ks *KeyStore) StoreKey(k bccsp.Key) error {
 	return ks.StoreKeyErr
 }
+func (ks *KeyStore) SetPassword(pwd []byte) {
+
+}
 
 type KeyImportOpts struct{}
 

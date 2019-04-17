@@ -31,7 +31,7 @@ import (
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
 	"github.com/palletone/go-palletone/common/log"
-    "github.com/tjfoc/gmsm/sm2"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 // NewFileBasedKeyStore instantiated a file-based key store at a given position.
@@ -163,6 +163,9 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		return ks.searchKeystoreForSKI(ski)
 	}
 }
+func (ks *fileBasedKeyStore) SetPassword(pwd []byte) {
+	ks.pwd = utils.Clone(pwd)
+}
 
 // StoreKey stores the key k in this KeyStore.
 // If this KeyStore is read only then the method will fail.
@@ -287,7 +290,7 @@ func (ks *fileBasedKeyStore) getSuffix(alias string) string {
 }
 
 func (ks *fileBasedKeyStore) storePrivateKey(alias string, privateKey interface{}) error {
-	log.Debugf("Try store private key to file.%s",alias)
+	log.Debugf("Try store private key to file.%s", alias)
 	rawKey, err := utils.PrivateKeyToPEM(privateKey, ks.pwd)
 	if err != nil {
 		log.Errorf("Failed converting private key to PEM [%s]: [%s]", alias, err)
@@ -441,20 +444,20 @@ func (ks *fileBasedKeyStore) getPathForAlias(alias, suffix string) string {
 	return filepath.Join(ks.path, alias+"_"+suffix)
 }
 
-func readKeyFromFile(privKeyPath , pubKeyPath string , pass []byte)(*sm2.PrivateKey,*sm2.PublicKey,  bool){
-    fmt.Println("begin to read！！！",privKeyPath)
-    fmt.Println("pass is ！！！",pass)
+func readKeyFromFile(privKeyPath, pubKeyPath string, pass []byte) (*sm2.PrivateKey, *sm2.PublicKey, bool) {
+	fmt.Println("begin to read！！！", privKeyPath)
+	fmt.Println("pass is ！！！", pass)
 	privateKey, e := sm2.ReadPrivateKeyFromPem(privKeyPath, pass)
-	if e != nil{
+	if e != nil {
 		fmt.Println("failed to read privateKey ！！！")
-		return nil,nil,false
+		return nil, nil, false
 	}
-	fmt.Printf("privateKey is %+v\n",privateKey)
+	fmt.Printf("privateKey is %+v\n", privateKey)
 	publicKey, i := sm2.ReadPublicKeyFromPem(pubKeyPath, pass)
-	if i!=nil{
+	if i != nil {
 		fmt.Println("failed to read publicKey ！！！")
-		return nil,nil,false
+		return nil, nil, false
 	}
-	fmt.Printf("publicKey is %+v\n",publicKey)
-	return privateKey,publicKey,true
+	fmt.Printf("publicKey is %+v\n", publicKey)
+	return privateKey, publicKey, true
 }

@@ -66,3 +66,4 @@ func (ks *inmemoryKeyStore) StoreKey(k bccsp.Key) error {
 
 	return nil
 }
+func (ks *inmemoryKeyStore) SetPassword(pwd []byte) {}

@@ -35,7 +35,7 @@ func TestEcdsaP256(t *testing.T) {
 	assert.Equal(t, hash1, hash2)
 	t.Logf("Hash Devin result:%x", hash1)
 
-	privKey, err := csp.KeyGen(&bccsp.ECDSAP256KeyGenOpts{})
+	privKey, err := csp.KeyGen(&bccsp.ECDSAP256KeyGenOpts{Password: []byte("1")})
 	assert.Nil(t, err)
 
 	privKeyB, err := privKey.Bytes()
@@ -128,7 +128,7 @@ func TestS256(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, csp)
 	t.Log("Try to generate new key")
-	privKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{})
+	privKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{Password: []byte("1")})
 	assert.Nil(t, err)
 	getPrivKey, err := csp.GetKey(privKey.SKI())
 	assert.Equal(t, privKey, getPrivKey)

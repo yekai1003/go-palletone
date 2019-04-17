@@ -47,3 +47,4 @@ func (ks *dummyKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 func (ks *dummyKeyStore) StoreKey(k bccsp.Key) error {
 	return errors.New("Cannot store key. This is a dummy read-only KeyStore")
 }
+func (ks *dummyKeyStore) SetPassword(pwd []byte) {}

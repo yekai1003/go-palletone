@@ -19,11 +19,15 @@ package bccsp
 // ECDSAP256KeyGenOpts contains options for ECDSA key generation with curve P-256.
 type ECDSAP256KeyGenOpts struct {
 	Temporary bool
+	Password  []byte
 }
 
 // Algorithm returns the key generation algorithm identifier (to be used).
 func (opts *ECDSAP256KeyGenOpts) Algorithm() string {
 	return ECDSAP256
+}
+func (opts *ECDSAP256KeyGenOpts) ProtectPassword() []byte {
+	return opts.Password
 }
 
 // Ephemeral returns true if the key to generate has to be ephemeral,
@@ -50,6 +54,7 @@ func (opts *ECDSAP384KeyGenOpts) Ephemeral() bool {
 
 type ECDSAS256KeyGenOpts struct {
 	Temporary bool
+	Password  []byte
 }
 
 // Algorithm returns the key generation algorithm identifier (to be used).
@@ -61,4 +66,7 @@ func (opts *ECDSAS256KeyGenOpts) Algorithm() string {
 // false otherwise.
 func (opts *ECDSAS256KeyGenOpts) Ephemeral() bool {
 	return opts.Temporary
+}
+func (opts *ECDSAS256KeyGenOpts) ProtectPassword() []byte {
+	return opts.Password
 }

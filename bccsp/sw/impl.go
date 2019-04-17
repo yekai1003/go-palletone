@@ -83,6 +83,10 @@ func (csp *CSP) KeyGen(opts bccsp.KeyGenOpts) (k bccsp.Key, err error) {
 	// If the key is not Ephemeral, store it.
 	if !opts.Ephemeral() {
 		// Store the key
+		pwd := opts.ProtectPassword()
+		if pwd != nil && len(pwd) > 0 {
+			csp.ks.SetPassword(pwd)
+		}
 		err = csp.ks.StoreKey(k)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed storing key [%s]", opts.Algorithm())

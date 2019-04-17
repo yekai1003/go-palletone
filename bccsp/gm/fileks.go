@@ -157,6 +157,9 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (k bccsp.Key, err error) {
 		return ks.searchKeystoreForSKI(ski)
 	}
 }
+func (ks *fileBasedKeyStore) SetPassword(pwd []byte) {
+	ks.pwd = utils.Clone(pwd)
+}
 
 // StoreKey stores the key k in this KeyStore.
 // If this KeyStore is read only then the method will fail.

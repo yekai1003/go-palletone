@@ -31,4 +31,5 @@ type KeyStore interface {
 	// StoreKey stores the key k in this KeyStore.
 	// If this KeyStore is read only then the method will fail.
 	StoreKey(k Key) (err error)
+	SetPassword(pwd []byte)
 }
