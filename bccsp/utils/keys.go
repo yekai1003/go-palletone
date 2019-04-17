@@ -22,12 +22,14 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/tjfoc/gmsm/sm2"
+	"math/big"
 )
 
 // struct to hold info required for PKCS#8
@@ -36,6 +38,12 @@ type pkcs8Info struct {
 	PrivateKeyAlgorithm []asn1.ObjectIdentifier
 	PrivateKey          []byte
 }
+
+var (
+	oidPublicKeyRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	oidPublicKeyDSA   = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 1}
+	oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+)
 
 type ecPrivateKey struct {
 	Version       int
@@ -52,8 +60,6 @@ var (
 	oidNamedCurveS256 = asn1.ObjectIdentifier{1, 3, 132, 0, 10}
 )
 
-var oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
-
 func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
 	switch curve {
 	case elliptic.P224():
@@ -68,6 +74,21 @@ func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
 		return oidNamedCurveS256, true
 	}
 	return nil, false
+}
+func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
+	switch {
+	case oid.Equal(oidNamedCurveP224):
+		return elliptic.P224()
+	case oid.Equal(oidNamedCurveP256):
+		return elliptic.P256()
+	case oid.Equal(oidNamedCurveP384):
+		return elliptic.P384()
+	case oid.Equal(oidNamedCurveP521):
+		return elliptic.P521()
+	case oid.Equal(oidNamedCurveS256):
+		return btcec.S256()
+	}
+	return nil
 }
 
 // PrivateKeyToDER marshals a private key to der
@@ -103,28 +124,30 @@ func PrivateKeyToPEM(privateKey interface{}, pwd []byte) ([]byte, error) {
 			return nil, errors.New("unknown elliptic curve")
 		}
 
-		// based on https://golang.org/src/crypto/x509/sec1.go
-		privateKeyBytes := k.D.Bytes()
-		paddedPrivateKey := make([]byte, (k.Curve.Params().N.BitLen()+7)/8)
-		copy(paddedPrivateKey[len(paddedPrivateKey)-len(privateKeyBytes):], privateKeyBytes)
-		// omit NamedCurveOID for compatibility as it's optional
-		asn1Bytes, err := asn1.Marshal(ecPrivateKey{
-			Version:    1,
-			PrivateKey: paddedPrivateKey,
-			PublicKey:  asn1.BitString{Bytes: elliptic.Marshal(k.Curve, k.X, k.Y)},
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling EC key to asn1 [%s]", err)
-		}
-
 		var pkcs8Key pkcs8Info
 		pkcs8Key.Version = 0
 		pkcs8Key.PrivateKeyAlgorithm = make([]asn1.ObjectIdentifier, 2)
 		pkcs8Key.PrivateKeyAlgorithm[0] = oidPublicKeyECDSA
 		pkcs8Key.PrivateKeyAlgorithm[1] = oidNamedCurve
-		pkcs8Key.PrivateKey = asn1Bytes
+		if k.Curve == btcec.S256() {
+			pkcs8Key.PrivateKey = FromECDSA(k)
+		} else {
+			// based on https://golang.org/src/crypto/x509/sec1.go
+			privateKeyBytes := k.D.Bytes()
+			paddedPrivateKey := make([]byte, (k.Curve.Params().N.BitLen()+7)/8)
+			copy(paddedPrivateKey[len(paddedPrivateKey)-len(privateKeyBytes):], privateKeyBytes)
+			// omit NamedCurveOID for compatibility as it's optional
+			asn1Bytes, err := asn1.Marshal(ecPrivateKey{
+				Version:    1,
+				PrivateKey: paddedPrivateKey,
+				PublicKey:  asn1.BitString{Bytes: elliptic.Marshal(k.Curve, k.X, k.Y)},
+			})
 
+			if err != nil {
+				return nil, fmt.Errorf("error marshaling EC key to asn1 [%s]", err)
+			}
+			pkcs8Key.PrivateKey = asn1Bytes
+		}
 		pkcs8Bytes, err := asn1.Marshal(pkcs8Key)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling EC key to asn1 [%s]", err)
@@ -204,7 +227,7 @@ func DERToPrivateKey(der []byte) (key interface{}, err error) {
 		return key, nil
 	}
 
-	if key, err = x509.ParsePKCS8PrivateKey(der); err == nil {
+	if key, err = ParsePKCS8PrivateKey(der); err == nil {
 		switch key.(type) {
 		case *rsa.PrivateKey, *ecdsa.PrivateKey:
 			return
@@ -218,6 +241,65 @@ func DERToPrivateKey(der []byte) (key interface{}, err error) {
 	}
 
 	return nil, errors.New("Invalid key type. The DER must contain an rsa.PrivateKey or ecdsa.PrivateKey")
+}
+
+type pkcs8 struct {
+	Version    int
+	Algo       pkix.AlgorithmIdentifier
+	PrivateKey []byte
+	// optional attributes omitted.
+}
+
+// ParsePKCS8PrivateKey parses an unencrypted, PKCS#8 private key.
+// See RFC 5208.
+func ParsePKCS8PrivateKey(der []byte) (key interface{}, err error) {
+	var privKey pkcs8
+	if _, err := asn1.Unmarshal(der, &privKey); err != nil {
+		return nil, err
+	}
+	if privKey.Algo.Algorithm.Equal(oidPublicKeyECDSA) {
+
+		bytes := privKey.Algo.Parameters.FullBytes
+		namedCurveOID := new(asn1.ObjectIdentifier)
+		if _, err := asn1.Unmarshal(bytes, namedCurveOID); err != nil {
+			namedCurveOID = nil
+		}
+		curve := namedCurveFromOID(*namedCurveOID)
+		if curve == btcec.S256() {
+			//return ToECDSA(privKey.PrivateKey)
+			return parseS256PrivateKey(privKey.PrivateKey, curve)
+		}
+	}
+	return x509.ParsePKCS8PrivateKey(der)
+}
+func parseS256PrivateKey(PrivateKey []byte, curve elliptic.Curve) (key interface{}, err error) {
+	k := new(big.Int).SetBytes(PrivateKey)
+	curveOrder := curve.Params().N
+	if k.Cmp(secp256k1_N) >= 0 {
+		return nil, errors.New("x509: invalid elliptic curve private key value")
+	}
+	priv := new(ecdsa.PrivateKey)
+	priv.Curve = curve
+	priv.D = k
+
+	privateKey := make([]byte, (curveOrder.BitLen()+7)/8)
+
+	// Some private keys have leading zero padding. This is invalid
+	// according to [SEC1], but this code will ignore it.
+	for len(PrivateKey) > len(privateKey) {
+		if PrivateKey[0] != 0 {
+			return nil, errors.New("x509: invalid private key length")
+		}
+		PrivateKey = PrivateKey[1:]
+	}
+
+	// Some private keys remove all leading zeros, this is also invalid
+	// according to [SEC1] but since OpenSSL used to do this, we ignore
+	// this too.
+	copy(privateKey[len(privateKey)-len(PrivateKey):], PrivateKey)
+	priv.X, priv.Y = curve.ScalarBaseMult(privateKey)
+
+	return priv, nil
 }
 
 // PEMtoPrivateKey unmarshals a pem to private key
