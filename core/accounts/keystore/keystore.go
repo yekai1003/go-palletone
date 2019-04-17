@@ -25,6 +25,15 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/palletone/go-palletone/common"
+	"github.com/palletone/go-palletone/common/crypto"
+	"github.com/palletone/go-palletone/common/event"
+	"github.com/palletone/go-palletone/common/log"
+	"github.com/palletone/go-palletone/common/math"
+	"github.com/palletone/go-palletone/common/util"
+	"github.com/palletone/go-palletone/core/accounts"
+	"github.com/palletone/go-palletone/dag/modules"
+	"github.com/tjfoc/gmsm/sm2"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -32,15 +41,6 @@ import (
 	"runtime"
 	"sync"
 	"time"
-	"github.com/palletone/go-palletone/common/math"
-	"github.com/palletone/go-palletone/common"
-	"github.com/palletone/go-palletone/common/crypto"
-	"github.com/palletone/go-palletone/common/event"
-	"github.com/palletone/go-palletone/common/log"
-	"github.com/palletone/go-palletone/common/util"
-	"github.com/palletone/go-palletone/core/accounts"
-	"github.com/palletone/go-palletone/dag/modules"
-	"github.com/tjfoc/gmsm/sm2"
 )
 
 var (
@@ -53,6 +53,7 @@ var (
 var KeyStoreType = reflect.TypeOf(&KeyStore{})
 
 var KeyStoreTypeSm2 = reflect.TypeOf(&Sm2KeyStore{})
+
 // KeyStoreScheme is the protocol scheme prefixing account and wallet URLs.
 var KeyStoreScheme = "keystore"
 
@@ -78,11 +79,12 @@ type unlocked struct {
 	*Key
 	abort chan struct{}
 }
+
 // KeyStore manages a key storage directory on disk.
 type Sm2KeyStore struct {
-	storage  sm2keyStore                     // Storage backend, might be cleartext or encrypted
-	cache    *accountCache                // In-memory account cache over the filesystem storage
-	changes  chan struct{}                // Channel receiving change notifications from the cache
+	storage     sm2keyStore                     // Storage backend, might be cleartext or encrypted
+	cache       *accountCache                   // In-memory account cache over the filesystem storage
+	changes     chan struct{}                   // Channel receiving change notifications from the cache
 	sm2unlocked map[common.Address]*sm2unlocked // Currently unlocked account (decrypted private keys)
 
 	wallets     []accounts.Wallet       // Wallet wrappers around the individual key files
@@ -94,9 +96,10 @@ type Sm2KeyStore struct {
 }
 
 type sm2unlocked struct {
-	Key *sm2.PrivateKey
+	Key   *sm2.PrivateKey
 	abort chan struct{}
 }
+
 // NewKeyStore creates a keystore for the given directory.
 func NewKeyStore(keydir string, scryptN, scryptP int) *KeyStore {
 	keydir, _ = filepath.Abs(keydir)
@@ -206,6 +209,7 @@ func (ks *KeyStore) refreshWallets() {
 		ks.updateFeed.Send(event)
 	}
 }
+
 // refreshWallets retrieves the current account list and based on that does any
 // necessary wallet refreshes.
 func (ks *Sm2KeyStore) refreshWallets() {
@@ -250,6 +254,7 @@ func (ks *Sm2KeyStore) refreshWallets() {
 		ks.updateFeed.Send(event)
 	}
 }
+
 // Subscribe implements accounts.Backend, creating an async subscription to
 // receive notifications on the addition or removal of keystore wallets.
 func (ks *KeyStore) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
@@ -285,6 +290,7 @@ func (ks *Sm2KeyStore) Subscribe(sink chan<- accounts.WalletEvent) event.Subscri
 	}
 	return sub
 }
+
 // updater is responsible for maintaining an up-to-date list of wallets stored in
 // the keystore, and for firing wallet addition/removal events. It listens for
 // account change events from the underlying account cache, and also periodically
@@ -336,6 +342,7 @@ func (ks *Sm2KeyStore) updater() {
 func (ks *KeyStore) HasAddress(addr common.Address) bool {
 	return ks.cache.hasAddress(addr)
 }
+
 // HasAddress reports whether a key with the given address is present.
 func (ks *Sm2KeyStore) HasAddress(addr common.Address) bool {
 	return ks.cache.hasAddress(addr)
@@ -345,10 +352,12 @@ func (ks *Sm2KeyStore) HasAddress(addr common.Address) bool {
 func (ks *KeyStore) Accounts() []accounts.Account {
 	return ks.cache.accounts()
 }
+
 // Accounts returns all key files present in the directory.
 func (ks *Sm2KeyStore) Accounts() []accounts.Account {
 	return ks.cache.accounts()
 }
+
 // Delete deletes the key matched by account if the passphrase is correct.
 // If the account contains no filename, the address must match a unique key.
 func (ks *KeyStore) Delete(a accounts.Account, passphrase string) error {
@@ -393,6 +402,7 @@ func (ks *Sm2KeyStore) Delete(a accounts.Account, passphrase string) error {
 	}
 	return err
 }
+
 // SignHash calculates a ECDSA signature for the given hash. The produced
 // signature is in the [R || S || V] format where V is 0 or 1.
 func (ks *KeyStore) SignHash(addr common.Address, hash []byte) ([]byte, error) {
@@ -419,7 +429,7 @@ func (ks *Sm2KeyStore) SignHash(addr common.Address, hash []byte) ([]byte, error
 	if !found {
 		return nil, ErrLocked
 	}
-	unlockedKey=unlockedKey
+	unlockedKey = unlockedKey
 	// Sign the hash using plain ECDSA operations
 	return nil, ErrLocked
 }
@@ -444,11 +454,13 @@ func (ks *KeyStore) SignTx(a accounts.Account, tx *modules.Transaction, chainID 
 	//tx.From.V = V
 	return tx, nil
 }
+
 // SignTx signs the given transaction with the requested account.
 func (ks *Sm2KeyStore) SignTx(a accounts.Account, tx *modules.Transaction, chainID *big.Int) (*modules.Transaction, error) {
-	
+
 	return tx, nil
 }
+
 // SignHashWithPassphrase signs hash if the private key matching the given address
 // can be decrypted with the given passphrase. The produced signature is in the
 // [R || S || V] format where V is 0 or 1.
@@ -466,7 +478,7 @@ func (ks *Sm2KeyStore) SignHashWithPassphrase(a accounts.Account, passphrase str
 	if err != nil {
 		return nil, err
 	}
-	key=key
+	key = key
 	//defer ZeroKey(key.PrivateKey)
 	return nil, err
 }
@@ -520,10 +532,12 @@ func (ks *Sm2KeyStore) SignTxWithPassphrase(a accounts.Account, passphrase strin
 func (ks *KeyStore) Unlock(a accounts.Account, passphrase string) error {
 	return ks.TimedUnlock(a, passphrase, 0)
 }
+
 // Unlock unlocks the given account indefinitely.
 func (ks *Sm2KeyStore) UnlockSm2(a accounts.Account, passphrase string) error {
 	return ks.TimedUnlock(a, passphrase, 0)
 }
+
 // Lock removes the private key with the given address from memory.
 func (ks *KeyStore) Lock(addr common.Address) error {
 	ks.mu.Lock()
@@ -535,6 +549,7 @@ func (ks *KeyStore) Lock(addr common.Address) error {
 	}
 	return nil
 }
+
 // Lock removes the private key with the given address from memory.
 func (ks *Sm2KeyStore) Lock(addr common.Address) error {
 	ks.mu.Lock()
@@ -546,6 +561,7 @@ func (ks *Sm2KeyStore) Lock(addr common.Address) error {
 	}
 	return nil
 }
+
 // TimedUnlock unlocks the given account with the passphrase. The account
 // stays unlocked for the duration of timeout. A timeout of 0 unlocks the account
 // until the program exits. The account must match a unique key file.
@@ -627,6 +643,7 @@ func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 	ks.cache.mu.Unlock()
 	return a, err
 }
+
 // Find resolves the given account into a unique entry in the keystore.
 func (ks *Sm2KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 	ks.cache.maybeReload()
@@ -692,6 +709,7 @@ func (ks *Sm2KeyStore) expire(addr common.Address, u *sm2unlocked, timeout time.
 		ks.mu.Unlock()
 	}
 }
+
 // NewAccount generates a new key and stores it into the key directory,
 // encrypting it with the passphrase.
 func (ks *KeyStore) NewAccount(passphrase string) (accounts.Account, error) {
@@ -705,6 +723,7 @@ func (ks *KeyStore) NewAccount(passphrase string) (accounts.Account, error) {
 	ks.refreshWallets()
 	return account, nil
 }
+
 // NewAccount generates a new key and stores it into the key directory,
 // encrypting it with the passphrase.
 func (ks *Sm2KeyStore) NewAccount(passphrase string) (accounts.Account, error) {
@@ -718,6 +737,7 @@ func (ks *Sm2KeyStore) NewAccount(passphrase string) (accounts.Account, error) {
 	ks.refreshWallets()
 	return account, nil
 }
+
 // Export exports as a JSON key, encrypted with newPassphrase.
 func (ks *KeyStore) Export(a accounts.Account, passphrase, newPassphrase string) (keyJSON []byte, err error) {
 	_, key, err := ks.getDecryptedKey(a, passphrase)
@@ -732,9 +752,10 @@ func (ks *KeyStore) Export(a accounts.Account, passphrase, newPassphrase string)
 	}
 	return EncryptKey(key, newPassphrase, N, P)
 }
+
 // Export exports as a JSON key, encrypted with newPassphrase.
 func (ks *Sm2KeyStore) Export(a accounts.Account, passphrase, newPassphrase string) (keyJSON []byte, err error) {
-	
+
 	return nil, err
 }
 func (ks *KeyStore) DumpKey(a accounts.Account, passphrase string) (privateKey []byte, err error) {
@@ -769,6 +790,7 @@ func (ks *Sm2KeyStore) DumpPrivateKey(a accounts.Account, passphrase string) (pr
 	return key, nil
 
 }
+
 // Import stores the given encrypted JSON key into the key directory.
 func (ks *KeyStore) Import(keyJSON []byte, passphrase, newPassphrase string) (accounts.Account, error) {
 	key, err := DecryptKey(keyJSON, passphrase)
@@ -780,11 +802,13 @@ func (ks *KeyStore) Import(keyJSON []byte, passphrase, newPassphrase string) (ac
 	}
 	return ks.importKey(key, newPassphrase)
 }
+
 // Import stores the given encrypted JSON key into the key directory.
 func (ks *Sm2KeyStore) Import(keyJSON []byte, passphrase, newPassphrase string) (accounts.Account, error) {
-	
+
 	return accounts.Account{}, nil
 }
+
 // ImportECDSA stores the given key into the key directory, encrypting it with the passphrase.
 func (ks *KeyStore) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (accounts.Account, error) {
 	key := newKeyFromECDSA(priv)
@@ -812,6 +836,7 @@ func (ks *KeyStore) Update(a accounts.Account, passphrase, newPassphrase string)
 	}
 	return ks.storage.StoreKey(a.URL.Path, key, newPassphrase)
 }
+
 // Update changes the passphrase of an existing account.
 func (ks *Sm2KeyStore) Update(a accounts.Account, passphrase, newPassphrase string) error {
 	a, key, err := ks.getDecryptedKey(a, passphrase)
@@ -820,6 +845,7 @@ func (ks *Sm2KeyStore) Update(a accounts.Account, passphrase, newPassphrase stri
 	}
 	return ks.storage.StoreKeySm2(a.URL.Path, key, newPassphrase)
 }
+
 // ZeroKey zeroes a private key in memory.
 func ZeroKey(k *ecdsa.PrivateKey) {
 	b := k.D.Bits()
@@ -863,7 +889,7 @@ func (ks *KeyStore) SigData(data interface{}, address common.Address) ([]byte, e
 		return nil, err
 	}
 	//defer ZeroKey(privateKey)
-	hash := crypto.Keccak256Hash(util.RHashBytes(data))
+	hash := crypto.HashResult(util.RHashBytes(data))
 	if err != nil {
 		return nil, err
 	}
@@ -875,7 +901,7 @@ func (ks *KeyStore) SigData(data interface{}, address common.Address) ([]byte, e
 }
 
 func (ks *KeyStore) SigUnitWithPwd(unit interface{}, privateKey *ecdsa.PrivateKey) ([]byte, error) {
-	hash := crypto.Keccak256Hash(util.RHashBytes(unit))
+	hash := crypto.HashResult(util.RHashBytes(unit))
 	//unit signature
 	sign, err := crypto.Sign(hash.Bytes(), privateKey)
 	if err != nil {
@@ -885,7 +911,7 @@ func (ks *KeyStore) SigUnitWithPwd(unit interface{}, privateKey *ecdsa.PrivateKe
 }
 
 func VerifyUnitWithPK(sign []byte, unit interface{}, publicKey []byte) bool {
-	hash := crypto.Keccak256Hash(util.RHashBytes(unit))
+	hash := crypto.HashResult(util.RHashBytes(unit))
 	// s, err := hexutil.Decode(sign)
 	// if err != nil {
 	// 	return false

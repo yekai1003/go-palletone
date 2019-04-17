@@ -131,7 +131,7 @@ func New(ctx *node.ServiceContext, config *Config) (*PalletOne, error) {
 	}
 	log.Info("Initialising PalletOne protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
-	crypto.Init()
+	crypto.InitCryptoLib(config.HashType, config.CryptoType, "./keystore")
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = ctx.ResolvePath(config.TxPool.Journal)
 	}

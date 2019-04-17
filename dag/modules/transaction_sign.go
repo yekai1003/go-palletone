@@ -227,6 +227,6 @@ package modules
 // 		return common.Address{}, errors.New("invalid public key")
 // 	}
 // 	var addr common.Address
-// 	copy(addr[:], crypto.Keccak256(pub[1:])[12:])
+// 	copy(addr[:], crypto.Hash(pub[1:])[12:])
 // 	return addr, nil
 // }

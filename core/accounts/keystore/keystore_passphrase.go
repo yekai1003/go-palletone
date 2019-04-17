@@ -43,9 +43,9 @@ import (
 	// "github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/math"
 	"github.com/pborman/uuid"
+	"github.com/tjfoc/gmsm/sm2"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/scrypt"
-	"github.com/tjfoc/gmsm/sm2"
 )
 
 const (
@@ -96,12 +96,13 @@ func (ks keyStorePassphrase) GetKey(addr common.Address, filename, auth string) 
 func (ks keyStorePassphrase) GetKeySm2(addr common.Address, filename, auth string) (*sm2.PrivateKey, error) {
 	// Load the key from the keystore and decrypt its contents
 	privateKey, e := sm2.ReadPrivateKeyFromPem(filename, []byte(auth))
-	if e != nil{
+	if e != nil {
 		fmt.Println("failed to read privateKey ！！！")
-		return nil,nil
+		return nil, nil
 	}
 	return privateKey, nil
 }
+
 // StoreKey generates a key, encrypts with 'auth' and stores in the given directory
 func StoreKey(dir, auth string, scryptN, scryptP int) (common.Address, error) {
 	_, a, err := storeNewKey(&keyStorePassphrase{dir, scryptN, scryptP}, crand.Reader, auth)
@@ -109,6 +110,7 @@ func StoreKey(dir, auth string, scryptN, scryptP int) (common.Address, error) {
 	// log.Debug("Address:" + a.Address.Str())
 	return a.Address, err
 }
+
 // StoreKey generates a key, encrypts with 'auth' and stores in the given directory
 func StoreKeySm2(dir, auth string, scryptN, scryptP int) (common.Address, error) {
 	fmt.Println("-------StoreKeySm2-------------------114----")
@@ -125,9 +127,9 @@ func (ks keyStorePassphrase) StoreKey(filename string, key *Key, auth string) er
 	return writeKeyFile(filename, keyjson)
 }
 func (ks keyStorePassphrase) StoreKeySm2(filename string, key *sm2.PrivateKey, auth string) error {
-	
-    fmt.Println("------keyStorePassphrase-StoreKeySm2-------------------129----")
-	fmt.Println("filename is ",filename)
+
+	fmt.Println("------keyStorePassphrase-StoreKeySm2-------------------129----")
+	fmt.Println("filename is ", filename)
 	_, err := sm2.WritePrivateKeytoPem(filename, key, []byte(auth))
 	if err != nil {
 		fmt.Println("密钥对写入文件错误！！！")
@@ -161,7 +163,7 @@ func EncryptKey(key *Key, auth string, scryptN, scryptP int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	mac := crypto.Keccak256(derivedKey[16:32], cipherText)
+	mac := crypto.Hash(derivedKey[16:32], cipherText)
 
 	scryptParamsJSON := make(map[string]interface{}, 5)
 	scryptParamsJSON["n"] = scryptN
@@ -259,7 +261,7 @@ func decryptKeyV3(keyProtected *encryptedKeyJSONV3, auth string) (keyBytes []byt
 		return nil, nil, err
 	}
 
-	calculatedMAC := crypto.Keccak256(derivedKey[16:32], cipherText)
+	calculatedMAC := crypto.Hash(derivedKey[16:32], cipherText)
 	if !bytes.Equal(calculatedMAC, mac) {
 		return nil, nil, ErrDecrypt
 	}
@@ -293,12 +295,12 @@ func decryptKeyV1(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byt
 		return nil, nil, err
 	}
 
-	calculatedMAC := crypto.Keccak256(derivedKey[16:32], cipherText)
+	calculatedMAC := crypto.Hash(derivedKey[16:32], cipherText)
 	if !bytes.Equal(calculatedMAC, mac) {
 		return nil, nil, ErrDecrypt
 	}
 
-	plainText, err := aesCBCDecrypt(crypto.Keccak256(derivedKey[:16])[:16], cipherText, iv)
+	plainText, err := aesCBCDecrypt(crypto.Hash(derivedKey[:16])[:16], cipherText, iv)
 	if err != nil {
 		return nil, nil, err
 	}

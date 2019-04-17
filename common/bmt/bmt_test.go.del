@@ -27,8 +27,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/palletone/go-palletone/common/crypto/sha3"
 )
 
 const (

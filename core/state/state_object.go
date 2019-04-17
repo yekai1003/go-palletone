@@ -27,7 +27,7 @@ import (
 	"github.com/palletone/go-palletone/common/crypto"
 )
 
-var emptyCodeHash = crypto.Keccak256(nil)
+var emptyCodeHash = crypto.Hash(nil)
 
 type Code []byte
 
@@ -113,7 +113,7 @@ func newObject(db *StateDB, address common.Address, data Account) *stateObject {
 	return &stateObject{
 		db:            db,
 		address:       address,
-		addrHash:      crypto.Keccak256Hash(address[:]),
+		addrHash:      crypto.HashResult(address[:]),
 		data:          data,
 		cachedStorage: make(Storage),
 		dirtyStorage:  make(Storage),

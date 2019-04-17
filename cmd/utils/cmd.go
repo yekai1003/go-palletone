@@ -254,7 +254,7 @@ func ImportPreimages(db *ptndb.LDBDatabase, fn string) error {
 			return err
 		}
 		// Accumulate the preimages and flush when enough ws gathered
-		preimages[crypto.Keccak256Hash(blob)] = common.CopyBytes(blob)
+		preimages[crypto.HashResult(blob)] = common.CopyBytes(blob)
 		if len(preimages) > 1024 {
 			if err := coredata.WritePreimages(db, 0, preimages); err != nil {
 				return err

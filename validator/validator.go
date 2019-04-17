@@ -103,7 +103,7 @@ func (validate *Validate) validateTransactions(txs modules.Transactions) Validat
 
 		allIncome := uint64(0)
 		outputs := coinbase.TxMessages[0].Payload.(*modules.PaymentPayload).Outputs
-		for _, output := range outputs{
+		for _, output := range outputs {
 			allIncome += output.Value
 		}
 		if allIncome != fee+reward {
@@ -156,7 +156,7 @@ func validateTxSignature(tx *modules.Transaction) bool {
 	//copy(cpySig[64-len(sig.S):64], sig.S)
 	//copy(cpySig[64:], sig.V)
 	//// recover pubkey
-	//hash := crypto.Keccak256Hash(util.RHashBytes(txHash))
+	//hash := crypto.HashResult(util.RHashBytes(txHash))
 	//pubKey, err := modules.RSVtoPublicKey(hash[:], sig.R[:], sig.S[:], sig.V[:])
 	//if err != nil {
 	//	log.Error("Validate transaction signature", "error", err.Error())

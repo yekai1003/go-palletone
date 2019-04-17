@@ -31,7 +31,7 @@ import (
 )
 
 func checkValid(reqEvt *AdapterRequestEvent) bool {
-	hash := crypto.Keccak256(reqEvt.ConsultData, reqEvt.Answer)
+	hash := crypto.Hash(reqEvt.ConsultData, reqEvt.Answer)
 	log.Debugf("sig: %s", common.Bytes2Hex(reqEvt.Sig))
 	sig := reqEvt.Sig[:len(reqEvt.Sig)-1] // remove recovery id
 	return crypto.VerifySignature(reqEvt.Pubkey, hash, sig)
@@ -126,7 +126,7 @@ func (p *Processor) AdapterFunRequest(reqId common.Hash, contractId common.Addre
 	}
 
 	//
-	hash := crypto.Keccak256(consultContent, myAnswer)
+	hash := crypto.Hash(consultContent, myAnswer)
 	sig, err := p.ptn.GetKeyStore().SignHashWithPassphrase(accounts.Account{Address: account.Address}, account.Password, hash)
 	if err != nil {
 		return nil, errors.New("AdapterFunRequest SignHashWithPassphrase failed")

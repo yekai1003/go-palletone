@@ -25,7 +25,7 @@ import (
 	"github.com/palletone/go-palletone/dag/modules"
 )
 
-var sha3_nil = crypto.Keccak256Hash(nil)
+var sha3_nil = crypto.HashResult(nil)
 
 func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*modules.Header, error) {
 	return nil, nil

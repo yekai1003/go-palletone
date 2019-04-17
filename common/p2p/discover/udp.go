@@ -500,7 +500,7 @@ func encodePacket(priv *ecdsa.PrivateKey, ptype byte, req interface{}) (packet, 
 	// add the hash to the front. Note: this doesn't protect the
 	// packet in any way. Our public key will be part of this hash in
 	// The future.
-	hash = crypto.Keccak256(packet[macSize:])
+	hash = crypto.Hash(packet[macSize:])
 	copy(packet, hash)
 	return packet, hash, nil
 }
@@ -551,7 +551,7 @@ func decodePacket(buf []byte) (packet, NodeID, []byte, error) {
 		return nil, NodeID{}, nil, errPacketTooSmall
 	}
 	hash, id, sigdata := buf[:macSize], buf[macSize:headSize], buf[headSize:]
-	shouldhash := crypto.Keccak256(buf[macSize:])
+	shouldhash := crypto.Hash(buf[macSize:])
 	if !bytes.Equal(hash, shouldhash) {
 		return nil, NodeID{}, nil, errBadHash
 	}
@@ -621,7 +621,7 @@ func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte
 		// (which is a much bigger packet than findnode) to the victim.
 		return errUnknownNode
 	}
-	target := crypto.Keccak256Hash(req.Target[:])
+	target := crypto.HashResult(req.Target[:])
 	t.mutex.Lock()
 	closest := t.closest(target, bucketSize).entries
 	t.mutex.Unlock()

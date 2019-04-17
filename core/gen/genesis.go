@@ -188,7 +188,7 @@ func GetGensisTransctions(ks *keystore.KeyStore, genesis *core.Genesis) (modules
 
 func sigData(key *ecdsa.PrivateKey, data interface{}) ([]byte, error) {
 	txBytes, _ := rlp.EncodeToBytes(data)
-	hash := crypto.Keccak256(txBytes)
+	hash := crypto.Hash(txBytes)
 	sign, err := crypto.Sign(hash, key)
 
 	return sign[0:64], err

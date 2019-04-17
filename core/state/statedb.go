@@ -38,10 +38,10 @@ type revision struct {
 
 var (
 	// emptyState is the known hash of an empty state trie entry.
-	emptyState = crypto.Keccak256Hash(nil)
+	emptyState = crypto.HashResult(nil)
 
 	// emptyCode is the known hash of the empty EVM bytecode.
-	emptyCode = crypto.Keccak256Hash(nil)
+	emptyCode = crypto.HashResult(nil)
 )
 
 // StateDBs within the ethereum protocol are used to store anything
@@ -305,7 +305,7 @@ func (self *StateDB) SetNonce(addr common.Address, nonce uint64) {
 func (self *StateDB) SetCode(addr common.Address, code []byte) {
 	stateObject := self.GetOrNewStateObject(addr)
 	if stateObject != nil {
-		stateObject.SetCode(crypto.Keccak256Hash(code), code)
+		stateObject.SetCode(crypto.HashResult(code), code)
 	}
 }
 

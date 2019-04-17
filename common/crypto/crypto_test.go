@@ -27,20 +27,48 @@ import (
 	"testing"
 
 	"github.com/palletone/go-palletone/common"
+
 	"github.com/palletone/go-palletone/common/hexutil"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/sha3"
 )
 
 var testAddr = "P136gdm7CfJcAeG2RFZNXvwwteg3uGzVqr5"
 var testPrivHex = "289c2857d4598e37fb9647507e47a309d6133539bf21a8b9cb6df88fd5232032"
+
+// Hash calculates and returns the Hash hash of the input data.
+func Keccak256_Old(data ...[]byte) []byte {
+	d := sha3.New256()
+	for _, b := range data {
+		d.Write(b)
+	}
+	return d.Sum(nil)
+}
+
+// HashResult calculates and returns the Hash hash of the input data,
+// converting it to an internal Hash data structure.
+func Keccak256Hash_Old(data ...[]byte) (h common.Hash) {
+	d := sha3.New256()
+	for _, b := range data {
+		d.Write(b)
+	}
+	d.Sum(h[:0])
+	return h
+}
 
 // These tests are sanity checks.
 // They should ensure that we don't e.g. use Sha3-224 instead of Sha3-256
 // and that the sha3 library uses keccak-f permutation.
 func TestKeccak256Hash(t *testing.T) {
 	msg := []byte("abc")
-	exp, _ := hex.DecodeString("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45")
-	checkhash(t, "Sha3-256-array", func(in []byte) []byte { h := Keccak256Hash(in); return h[:] }, msg, exp)
+	exp := Keccak256Hash_Old(msg)
+	cryptoLibHash := Hash(msg)
+	assert.Equal(t, exp.Bytes(), cryptoLibHash)
+
+	expBytes := Keccak256_Old(msg)
+	assert.Equal(t, expBytes, cryptoLibHash)
+	//exp, _ := hex.DecodeString("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45")
+	//checkhash(t, "Sha3-256-array", func(in []byte) []byte { h := HashResult(in); return h[:] }, msg, exp)
 }
 
 func TestToECDSAErrors(t *testing.T) {
@@ -55,7 +83,7 @@ func TestToECDSAErrors(t *testing.T) {
 func BenchmarkSha3(b *testing.B) {
 	a := []byte("hello world")
 	for i := 0; i < b.N; i++ {
-		Keccak256(a)
+		Hash(a)
 	}
 }
 
@@ -66,7 +94,7 @@ func TestSign(t *testing.T) {
 	// t.Logf("Address is :%s", PubkeyToAddress(&key.PublicKey).String())
 	addr, _ := common.StringToAddress(testAddr)
 
-	msg := Keccak256([]byte("foo"))
+	msg := Hash([]byte("foo"))
 	sig, err := Sign(msg, key)
 	if err != nil {
 		t.Errorf("Sign error: %s", err)
@@ -217,7 +245,7 @@ func TestPythonIntegration(t *testing.T) {
 	kh := "289c2857d4598e37fb9647507e47a309d6133539bf21a8b9cb6df88fd5232032"
 	k0, _ := HexToECDSA(kh)
 
-	msg0 := Keccak256([]byte("foo"))
+	msg0 := Hash([]byte("foo"))
 	sig0, _ := Sign(msg0, k0)
 
 	msg1 := common.FromHex("00000000000000000000000000000000")

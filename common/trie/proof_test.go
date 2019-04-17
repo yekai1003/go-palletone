@@ -100,7 +100,7 @@ func TestVerifyBadProof(t *testing.T) {
 		node, _ := proofs.Get(key)
 		proofs.Delete(key)
 		mutateByte(node)
-		proofs.Put(crypto.Keccak256(node), node)
+		proofs.Put(crypto.Hash(node), node)
 		if _, err, _ := VerifyProof(root, kv.k, proofs); err == nil {
 			t.Fatalf("expected proof to fail for key %x", kv.k)
 		}

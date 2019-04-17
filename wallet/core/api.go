@@ -453,7 +453,7 @@ func (api *SignerAPI) EcRecover(ctx context.Context, data, sig hexutil.Bytes) (c
 // This gives context to the signed message and prevents signing of transactions.
 func SignHash(data []byte) ([]byte, string) {
 	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
-	return crypto.Keccak256([]byte(msg)), msg
+	return crypto.Hash([]byte(msg)), msg
 }
 
 // Export returns encrypted private key associated with the given address in web3 keystore format.

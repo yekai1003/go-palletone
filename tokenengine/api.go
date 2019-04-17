@@ -226,7 +226,7 @@ type account struct {
 }
 
 func (a *account) Hash(msg []byte) ([]byte, error) {
-	return crypto.Keccak256(msg), nil
+	return crypto.Hash(msg), nil
 }
 func (a *account) Sign(address common.Address, digest []byte) ([]byte, error) {
 	return a.signFn(address, digest)

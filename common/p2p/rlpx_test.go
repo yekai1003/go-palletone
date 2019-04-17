@@ -33,7 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/crypto/ecies"
-	"github.com/palletone/go-palletone/common/crypto/sha3"
+
 	"github.com/palletone/go-palletone/common/p2p/discover"
 )
 
@@ -270,8 +270,8 @@ func TestRLPXFrameFake(t *testing.T) {
 	buf := new(bytes.Buffer)
 	hash := fakeHash([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1})
 	rw := newRLPXFrameRW(buf, secrets{
-		AES:        crypto.Keccak256(),
-		MAC:        crypto.Keccak256(),
+		AES:        crypto.Hash(),
+		MAC:        crypto.Hash(),
 		IngressMAC: hash,
 		EgressMAC:  hash,
 	})
@@ -331,22 +331,25 @@ func TestRLPXFrameRW(t *testing.T) {
 		rand.Read(s)
 	}
 	conn := new(bytes.Buffer)
-
+	hash1, _ := crypto.GetHash()
+	hash2, _ := crypto.GetHash()
 	s1 := secrets{
 		AES:        aesSecret,
 		MAC:        macSecret,
-		EgressMAC:  sha3.NewKeccak256(),
-		IngressMAC: sha3.NewKeccak256(),
+		EgressMAC:  hash1,
+		IngressMAC: hash2,
 	}
 	s1.EgressMAC.Write(egressMACinit)
 	s1.IngressMAC.Write(ingressMACinit)
 	rw1 := newRLPXFrameRW(conn, s1)
 
+	hash3, _ := crypto.GetHash()
+	hash4, _ := crypto.GetHash()
 	s2 := secrets{
 		AES:        aesSecret,
 		MAC:        macSecret,
-		EgressMAC:  sha3.NewKeccak256(),
-		IngressMAC: sha3.NewKeccak256(),
+		EgressMAC:  hash3,
+		IngressMAC: hash4,
 	}
 	s2.EgressMAC.Write(ingressMACinit)
 	s2.IngressMAC.Write(egressMACinit)

@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/palletone/go-palletone/common"
-	"github.com/palletone/go-palletone/common/crypto/sha3"
 	"github.com/palletone/go-palletone/common/math"
 	"io"
 	"io/ioutil"
@@ -38,39 +37,30 @@ var (
 	secp256k1_halfN = new(big.Int).Div(secp256k1_N, big.NewInt(2))
 )
 
-// Keccak256 calculates and returns the Keccak256 hash of the input data.
-func Keccak256(data ...[]byte) []byte {
-	d := sha3.NewKeccak256()
-	for _, b := range data {
-		d.Write(b)
-	}
-	return d.Sum(nil)
-}
+// Hash calculates and returns the Hash hash of the input data.
+//func Keccak256(data ...[]byte) []byte {
+//	d := sha3.New256()
+//	for _, b := range data {
+//		d.Write(b)
+//	}
+//	return d.Sum(nil)
+//}
 
-// Keccak256Hash calculates and returns the Keccak256 hash of the input data,
+// HashResult calculates and returns the Hash hash of the input data,
 // converting it to an internal Hash data structure.
-func Keccak256Hash(data ...[]byte) (h common.Hash) {
-	d := sha3.NewKeccak256()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Sum(h[:0])
-	return h
-}
-
-// Keccak512 calculates and returns the Keccak512 hash of the input data.
-func Keccak512(data ...[]byte) []byte {
-	d := sha3.NewKeccak512()
-	for _, b := range data {
-		d.Write(b)
-	}
-	return d.Sum(nil)
-}
+//func Keccak256Hash(data ...[]byte) (h common.Hash) {
+//	d := sha3.New256()
+//	for _, b := range data {
+//		d.Write(b)
+//	}
+//	d.Sum(h[:0])
+//	return h
+//}
 
 // Creates an ethereum address given the bytes and the nonce
 //func CreateAddress(b common.Address, nonce uint64) common.Address {
 //	data, _ := rlp.EncodeToBytes([]interface{}{b, nonce})
-//	return common.BytesToAddress(Keccak256(data)[12:])
+//	return common.BytesToAddress(Hash(data)[12:])
 //}
 
 // ToECDSA creates a private key with the given D value.

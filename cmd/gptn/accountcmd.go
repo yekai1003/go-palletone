@@ -346,6 +346,7 @@ func unlocksm2Account(ctx *cli.Context, ks *keystore.Sm2KeyStore, address string
 
 	return accounts.Account{}, ""
 }
+
 // getPassPhrase retrieves the password associated with an account, either fetched
 // from a list of preloaded passphrases, or requested interactively from the user.
 func getPassPhrase(prompt string, confirmation bool, i int, passwords []string) string {
@@ -427,6 +428,7 @@ func sm2ambiguousAddrRecovery(ks *keystore.Sm2KeyStore, err *keystore.AmbiguousA
 	}
 	return *match
 }
+
 // accountCreate creates a new account into the keystore defined by the CLI flags.
 func createAccount(ctx *cli.Context, password string) (common.Address, error) {
 	var err error
@@ -436,7 +438,7 @@ func createAccount(ctx *cli.Context, password string) (common.Address, error) {
 	if cfg, configDir, err = maybeLoadConfig(ctx); err != nil {
 		utils.Fatalf("%v", err)
 	}
-    fmt.Println("-------createAccount-------------------439----")
+	fmt.Println("-------createAccount-------------------439----")
 	cfg.Node.P2P = cfg.P2P
 	utils.SetNodeConfig(ctx, &cfg.Node, configDir)
 	scryptN, scryptP, keydir, err := cfg.Node.AccountConfig()
@@ -497,7 +499,7 @@ func accountSignString(ctx *cli.Context) error {
 	ks := stack.GetKeyStore()
 	addr := ctx.Args().First()
 	account, _ := utils.MakeAddress(ks, addr)
-	hash := crypto.Keccak256Hash([]byte(ctx.Args()[1]))
+	hash := crypto.HashResult([]byte(ctx.Args()[1]))
 	fmt.Printf("%s Hash:%s", addr, hash.String())
 	pwd := getPassPhrase("Please give a password to unlock your account", false, 0, utils.MakePasswordList(ctx))
 	sign, err := ks.SignHashWithPassphrase(account, pwd, hash.Bytes())
@@ -535,7 +537,7 @@ func accountSignVerify(ctx *cli.Context) error {
 	addr := ctx.Args().First()
 	account, _ := utils.MakeAddress(ks, addr)
 
-	hash := crypto.Keccak256Hash([]byte(ctx.Args()[1]))
+	hash := crypto.HashResult([]byte(ctx.Args()[1]))
 	sign := ctx.Args()[2]
 	fmt.Printf("\n%s Hash:%s\n", addr, hash.String())
 	pwd := getPassPhrase("Please give a password to unlock your account", false, 0, utils.MakePasswordList(ctx))

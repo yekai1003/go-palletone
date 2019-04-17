@@ -168,13 +168,13 @@ func TestMain(m *testing.M) {
 }
 func TestHash(t *testing.T) {
 	str := "Devin"
-	hash := Hash([]byte(str))
+	hash := HashResult([]byte(str))
 	t.Log(hash.String())
 }
 func BenchmarkHash(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		str := fmt.Sprintf("Devin%d", i)
-		hash := Hash([]byte(str))
+		hash := HashResult([]byte(str))
 		b.Log(str, hash.String())
 	}
 }

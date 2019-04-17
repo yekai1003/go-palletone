@@ -232,7 +232,7 @@ func (tab *Table) setFallbackNodes(nodes []*Node) error {
 		cpy := *n
 		// Recompute cpy.sha because the node might not have been
 		// created by NewNode or ParseNode.
-		cpy.sha = crypto.Keccak256Hash(n.ID[:])
+		cpy.sha = crypto.HashResult(n.ID[:])
 		tab.nursery = append(tab.nursery, &cpy)
 	}
 	return nil
@@ -253,7 +253,7 @@ func (tab *Table) isInitDone() bool {
 func (tab *Table) Resolve(targetID NodeID) *Node {
 	// If the node is present in the local table, no
 	// network interaction is required.
-	hash := crypto.Keccak256Hash(targetID[:])
+	hash := crypto.HashResult(targetID[:])
 	tab.mutex.Lock()
 	cl := tab.closest(hash, 1)
 	tab.mutex.Unlock()
@@ -281,7 +281,7 @@ func (tab *Table) Lookup(targetID NodeID) []*Node {
 
 func (tab *Table) lookup(targetID NodeID, refreshIfEmpty bool) []*Node {
 	var (
-		target         = crypto.Keccak256Hash(targetID[:])
+		target         = crypto.HashResult(targetID[:])
 		asked          = make(map[NodeID]bool)
 		seen           = make(map[NodeID]bool)
 		reply          = make(chan []*Node, alpha)

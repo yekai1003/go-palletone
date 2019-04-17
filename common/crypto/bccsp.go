@@ -26,6 +26,7 @@ import (
 	"github.com/palletone/go-palletone/common"
 
 	"github.com/palletone/go-palletone/common/log"
+	"hash"
 )
 
 type HashType byte
@@ -64,7 +65,7 @@ func InitCryptoLib(hashType string, cryptoType string, keystorePath string) (*Cr
 	return Init(hashTp, cryptoTp, keystorePath)
 }
 func InitDefaultCryptoLib() (*CryptoLib, error) {
-	return Init(HashType_SHA3_256, CryptoType_ECDSA_P256, "/keystore/")
+	return Init(HashType_SHA3_256, CryptoType_ECDSA_P256, "./keystore/")
 }
 func Init(hashType HashType, cryptoType CryptoType, keystorePath string) (*CryptoLib, error) {
 	log.Debug("Try to initial bccsp instance.")
@@ -106,21 +107,39 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) (*Crypt
 	myCryptoLib = cryptoLib
 	return cryptoLib, nil
 }
-func (lib *CryptoLib) Hash(data []byte) common.Hash {
+func (lib *CryptoLib) Hash(data ...[]byte) []byte {
 
 	hf, _ := lib.csp.GetHash(lib.hashOpt)
-	hf.Write(data)
+	for _, b := range data {
+		hf.Write(b)
+	}
 	hash := hf.Sum(nil)
-	return common.BytesToHash(hash)
+	return hash
 }
-func Hash(data []byte) common.Hash {
+func Hash(data ...[]byte) []byte {
 	if myCryptoLib == nil {
 		_, err := InitDefaultCryptoLib()
 		if err != nil {
-			return common.Hash{}
+			return nil
 		}
 	}
-	return myCryptoLib.Hash(data)
+	return myCryptoLib.Hash(data...)
+}
+func HashResult(data ...[]byte) common.Hash {
+	b := Hash(data...)
+	return common.BytesToHash(b)
+}
+func (lib *CryptoLib) GetHash() (hash.Hash, error) {
+	return lib.csp.GetHash(lib.hashOpt)
+}
+func GetHash() (hash.Hash, error) {
+	if myCryptoLib == nil {
+		_, err := InitDefaultCryptoLib()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return myCryptoLib.GetHash()
 }
 func (lib *CryptoLib) GenerateNewAddress() (common.Address, error) {
 	prvKey, err := lib.csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{Temporary: false})

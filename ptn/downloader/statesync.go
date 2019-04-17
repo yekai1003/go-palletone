@@ -23,7 +23,8 @@ import (
 	"time"
 
 	"github.com/palletone/go-palletone/common"
-	"github.com/palletone/go-palletone/common/crypto/sha3"
+	"github.com/palletone/go-palletone/common/crypto"
+
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/trie"
 	"github.com/palletone/go-palletone/dag/state"
@@ -235,10 +236,11 @@ type stateTask struct {
 // newStateSync creates a new state trie download scheduler. This method does not
 // yet start the sync. The user needs to call run to initiate.
 func newStateSync(d *Downloader, root common.Hash) *stateSync {
+	hash, _ := crypto.GetHash()
 	return &stateSync{
 		d:       d,
 		sched:   state.NewStateSync(root /*, d.stateDB*/),
-		keccak:  sha3.NewKeccak256(),
+		keccak:  hash, //sha3.NewKeccak256(),
 		tasks:   make(map[common.Hash]*stateTask),
 		deliver: make(chan *stateReq),
 		cancel:  make(chan struct{}),

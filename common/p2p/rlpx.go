@@ -40,7 +40,6 @@ import (
 	// "github.com/palletone/go-palletone/common/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/snappy"
-	"github.com/palletone/go-palletone/common/crypto/sha3"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/p2p/discover"
 )
@@ -248,19 +247,21 @@ func (h *encHandshake) secrets(auth, authResp []byte) (secrets, error) {
 	}
 
 	// derive base secrets from ephemeral key agreement
-	sharedSecret := crypto.Keccak256(ecdheSecret, crypto.Keccak256(h.respNonce, h.initNonce))
-	aesSecret := crypto.Keccak256(ecdheSecret, sharedSecret)
+	sharedSecret := crypto.Hash(ecdheSecret, crypto.Hash(h.respNonce, h.initNonce))
+	aesSecret := crypto.Hash(ecdheSecret, sharedSecret)
 	s := secrets{
 		RemoteID: h.remoteID,
 		AES:      aesSecret,
-		MAC:      crypto.Keccak256(ecdheSecret, aesSecret),
+		MAC:      crypto.Hash(ecdheSecret, aesSecret),
 	}
 
 	// setup sha3 instances for the MACs
-	mac1 := sha3.NewKeccak256()
+	//mac1 := sha3.NewKeccak256()
+	mac1, _ := crypto.GetHash()
 	mac1.Write(xor(s.MAC, h.respNonce))
 	mac1.Write(auth)
-	mac2 := sha3.NewKeccak256()
+	//mac2 := sha3.NewKeccak256()
+	mac2, _ := crypto.GetHash()
 	mac2.Write(xor(s.MAC, h.initNonce))
 	mac2.Write(authResp)
 	if h.initiator {
@@ -447,7 +448,7 @@ func (h *encHandshake) makeAuthResp() (msg *authRespV4, err error) {
 func (msg *authMsgV4) sealPlain(h *encHandshake) ([]byte, error) {
 	buf := make([]byte, authMsgLen)
 	n := copy(buf, msg.Signature[:])
-	n += copy(buf[n:], crypto.Keccak256(exportPubkey(&h.randomPrivKey.PublicKey)))
+	n += copy(buf[n:], crypto.Hash(exportPubkey(&h.randomPrivKey.PublicKey)))
 	n += copy(buf[n:], msg.InitiatorPubkey[:])
 	n += copy(buf[n:], msg.Nonce[:])
 	buf[n] = 0 // token-flag
