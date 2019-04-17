@@ -23,13 +23,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/palletone/go-palletone/common"
-	"github.com/palletone/go-palletone/common/crypto/sha3"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/palletone/go-palletone/common"
+	"github.com/palletone/go-palletone/common/crypto"
 )
 
 func RlpHash(x interface{}) (h common.Hash) {
-	hw := sha3.NewKeccak256()
+	//hw := sha3.NewKeccak256()
+	hw, _ := crypto.GetHash()
 	rlp.Encode(hw, x)
 	hw.Sum(h[:0])
 	return h

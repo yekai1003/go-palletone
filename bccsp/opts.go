@@ -15,6 +15,8 @@ limitations under the License.
 */
 package bccsp
 
+import "fmt"
+
 const (
 	// ECDSA Elliptic Curve Digital Signature Algorithm (key gen, import, sign, verify),
 	// at default security level.
@@ -158,11 +160,33 @@ func (opts *ECDSAPKIXPublicKeyImportOpts) Ephemeral() bool {
 // or PKCS#8 format.
 type ECDSAPrivateKeyImportOpts struct {
 	Temporary bool
+	Format ECDSAPrivateKeyFormat
 }
+type ECDSAPrivateKeyFormat byte
+const (ECDSAPrivateKeyFormat_WIF ECDSAPrivateKeyFormat=iota
+	ECDSAPrivateKeyFormat_Hex
+	ECDSAPrivateKeyFormat_DER
+	ECDSAPrivateKeyFormat_KeyStoreFile
+	ECDSAPrivateKeyFormat_Mnemonic //助记词
 
+)
 // Algorithm returns the key importation algorithm identifier (to be used).
 func (opts *ECDSAPrivateKeyImportOpts) Algorithm() string {
-	return ECDSA
+	//return ECDSA
+	switch opts.Format {
+	case ECDSAPrivateKeyFormat_Hex:
+		return "Hex"
+	case ECDSAPrivateKeyFormat_DER:
+		return "DER"
+	case ECDSAPrivateKeyFormat_WIF:
+		return "WIF"
+	case ECDSAPrivateKeyFormat_KeyStoreFile:
+		return "KeyStore"
+	case ECDSAPrivateKeyFormat_Mnemonic:
+		return "Mnemonic"
+	default:
+		return fmt.Sprintf("%d", int(opts.Format))
+	}
 }
 
 // Ephemeral returns true if the key to generate has to be ephemeral,

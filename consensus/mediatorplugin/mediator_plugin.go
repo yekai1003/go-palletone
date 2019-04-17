@@ -11,6 +11,7 @@
    You should have received a copy of the GNU General Public License
    along with go-palletone.  If not, see <http://www.gnu.org/licenses/>.
 */
+
 /*
  * @author PalletOne core developer Albert·Gou <dev@pallet.one>
  * @date 2018
@@ -111,7 +112,7 @@ func (mp *MediatorPlugin) unitProductionLoop() ProductionCondition {
 		log.Debug("Not producing unit because current scheduled mediator is " +
 			detail["ScheduledMediator"])
 	case Lag:
-		log.Info("Not producing unit because node didn't wake up within 500ms of the slot time." +
+		log.Info("Not producing unit because node didn't wake up within 2500ms of the slot time." +
 			" Scheduled Time is: " + detail["ScheduledTime"] + ", but now is " + detail["Now"])
 	//case NoPrivateKey:
 	//	log.Info("Not producing unit because I don't have the private key for " +
@@ -137,10 +138,6 @@ func (mp *MediatorPlugin) unitProductionLoop() ProductionCondition {
 }
 
 func (mp *MediatorPlugin) maybeProduceUnit() (ProductionCondition, map[string]string) {
-	//defer func(start time.Time) {
-	//	log.Debug("maybeProduceUnit unit elapsed", "elapsed", time.Since(start))
-	//}(time.Now())
-
 	detail := make(map[string]string)
 	dag := mp.dag
 
@@ -200,9 +197,14 @@ func (mp *MediatorPlugin) maybeProduceUnit() (ProductionCondition, map[string]st
 	//	return NoPrivateKey, detail
 	//}
 
-	if !mp.consecutiveProduceEnabled && dag.IsConsecutiveMediator(scheduledMediator) {
-		detail["Mediator"] = scheduledMediator.Str()
-		return Consecutive, detail
+	if dag.IsConsecutiveMediator(scheduledMediator) {
+		if mp.consecutiveProduceEnabled {
+			// 连续产块的特权只能使用一次
+			mp.consecutiveProduceEnabled = false
+		} else {
+			detail["Mediator"] = scheduledMediator.Str()
+			return Consecutive, detail
+		}
 	}
 
 	pRate := dag.MediatorParticipationRate()
@@ -213,10 +215,9 @@ func (mp *MediatorPlugin) maybeProduceUnit() (ProductionCondition, map[string]st
 
 	// todo 由于当前代码更新数据库没有加锁，可能如下情况：
 	// 生产单元的协程满足了前面的判断，此时新收到一个unit正在更新数据库，后面的判断有不能通过
-	// todo 调试的代码，暂时注释掉该判断，release版本的代码必须使用该判断
 	scheduledTime := dag.GetSlotTime(slot)
 	diff := scheduledTime.Sub(now)
-	if diff > 500*time.Millisecond || diff < -500*time.Millisecond {
+	if diff > 2500*time.Millisecond || diff < -2500*time.Millisecond {
 		detail["ScheduledTime"] = scheduledTime.Format("2006-01-02 15:04:05")
 		detail["Now"] = now.Format("2006-01-02 15:04:05")
 		return Lag, detail
@@ -229,7 +230,11 @@ func (mp *MediatorPlugin) maybeProduceUnit() (ProductionCondition, map[string]st
 		log.Debug("MaybeProduceUnit", "RunContractLoop err:", err.Error())
 	}
 
-	groupPubKey := mp.LocalMediatorPubKey(scheduledMediator)
+	var groupPubKey []byte = nil
+	if mp.groupSigningEnabled {
+		groupPubKey = mp.LocalMediatorPubKey(scheduledMediator)
+	}
+
 	newUnit := dag.GenerateUnit(scheduledTime, scheduledMediator, groupPubKey, ks, mp.ptn.TxPool())
 	if newUnit == nil || newUnit.IsEmpty() {
 		detail["Msg"] = "The newly produced unit is empty!"

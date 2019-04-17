@@ -139,7 +139,7 @@ func Install(dag dag.IDag, chainID string, ccName string, ccPath string, ccVersi
 	buffer.Write([]byte(ccName))
 	buffer.Write([]byte(ccPath))
 	buffer.Write([]byte(ccVersion))
-	tpid := cp.Keccak256Hash(buffer.Bytes())
+	tpid := cp.HashResult(buffer.Bytes())
 	payloadUnit := &md.ContractTplPayload{
 		TemplateId: []byte(tpid[:]),
 		Name:       ccName,

@@ -70,6 +70,9 @@ func (validate *Validate) validateTransactions(txs modules.Transactions) Validat
 	var coinbase *modules.Transaction
 	for txIndex, tx := range txs {
 		txHash := tx.Hash()
+		if validate.checkTxIsExist(tx) {
+			return TxValidationCode_DUPLICATE_TXID
+		}
 		if txIndex == 0 && tx.TxMessages[0].Payload.(*modules.PaymentPayload).IsCoinbase() {
 			needCheckCoinbase = true
 			coinbase = tx
@@ -83,13 +86,6 @@ func (validate *Validate) validateTransactions(txs modules.Transactions) Validat
 
 			return txCode
 		}
-		//getUtxoFromUnitAndDb := func(outpoint *modules.OutPoint) (*modules.Utxo, error) {
-		//	if utxo, ok := unitUtxo[*outpoint]; ok {
-		//		return utxo, nil
-		//	}
-		//	return validate.utxoquery.GetUtxoEntry(outpoint)
-		//}
-		//txFee, _ := tx.GetTxFee(getUtxoFromUnitAndDb)
 		txFee, _ := tx.GetTxFee(validate.utxoquery.GetUtxoEntry)
 		fee += txFee.Amount
 
@@ -105,9 +101,13 @@ func (validate *Validate) validateTransactions(txs modules.Transactions) Validat
 		reward := ComputeRewards()
 		//TODO PTN增发的情况
 
-		mediatorIncome := coinbase.TxMessages[0].Payload.(*modules.PaymentPayload).Outputs[0].Value
-		if mediatorIncome != fee+reward {
-			log.Warnf("Unit has an incorrect coinbase, expect income=%d,actual=%d", fee+reward, mediatorIncome)
+		allIncome := uint64(0)
+		outputs := coinbase.TxMessages[0].Payload.(*modules.PaymentPayload).Outputs
+		for _, output := range outputs {
+			allIncome += output.Value
+		}
+		if allIncome != fee+reward {
+			log.Warnf("Unit has an incorrect coinbase, expect income=%d,actual=%d", fee+reward, allIncome)
 			return TxValidationCode_INVALID_FEE
 		}
 	}
@@ -156,7 +156,7 @@ func validateTxSignature(tx *modules.Transaction) bool {
 	//copy(cpySig[64-len(sig.S):64], sig.S)
 	//copy(cpySig[64:], sig.V)
 	//// recover pubkey
-	//hash := crypto.Keccak256Hash(util.RHashBytes(txHash))
+	//hash := crypto.HashResult(util.RHashBytes(txHash))
 	//pubKey, err := modules.RSVtoPublicKey(hash[:], sig.R[:], sig.S[:], sig.V[:])
 	//if err != nil {
 	//	log.Error("Validate transaction signature", "error", err.Error())

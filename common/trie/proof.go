@@ -20,11 +20,11 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/ptndb"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Prove constructs a merkle proof for key. The result contains all encoded nodes
@@ -79,7 +79,7 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ptndb.Putter) error {
 			} else {
 				enc, _ := rlp.EncodeToBytes(n)
 				if !ok {
-					hash = crypto.Keccak256(enc)
+					hash = crypto.Hash(enc)
 				}
 				proofDb.Put(hash, enc)
 			}

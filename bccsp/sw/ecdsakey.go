@@ -18,7 +18,7 @@ package sw
 import (
 	"crypto/ecdsa"
 	"crypto/x509"
-	"errors"
+	//"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/palletone/go-palletone/bccsp"
@@ -34,7 +34,8 @@ type ecdsaPrivateKey struct {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *ecdsaPrivateKey) Bytes() ([]byte, error) {
-	return nil, errors.New("Not supported.")
+	return utils.FromECDSA( k.privKey),nil
+	//return nil, errors.New("Not supported.")
 }
 
 // SKI returns the subject key identifier of this key.

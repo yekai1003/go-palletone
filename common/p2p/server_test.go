@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/palletone/go-palletone/common/crypto"
-	"github.com/palletone/go-palletone/common/crypto/sha3"
+
 	"github.com/palletone/go-palletone/common/p2p/discover"
 )
 
@@ -42,11 +42,13 @@ type testTransport struct {
 
 func newTestTransport(id discover.NodeID, fd net.Conn) transport {
 	wrapped := newRLPX(fd).(*rlpx)
+	hash1, _ := crypto.GetHash()
+	hash2, _ := crypto.GetHash()
 	wrapped.rw = newRLPXFrameRW(fd, secrets{
 		MAC:        zero16,
 		AES:        zero16,
-		IngressMAC: sha3.NewKeccak256(),
-		EgressMAC:  sha3.NewKeccak256(),
+		IngressMAC: hash1,
+		EgressMAC:  hash2,
 	})
 	return &testTransport{id: id, rlpx: wrapped}
 }

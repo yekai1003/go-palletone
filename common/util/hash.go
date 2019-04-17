@@ -18,42 +18,43 @@
 
 package util
 
-import (
-	"crypto/md5"
-	"crypto/sha1"
-	"crypto/sha256"
-	"crypto/sha512"
-	"fmt"
+//
+//import (
+//	"crypto/md5"
+//	"crypto/sha1"
+//	"crypto/sha256"
+//	"crypto/sha512"
+//	"fmt"
+//
+//	"github.com/ethereum/go-ethereum/rlp"
+//	"github.com/palletone/go-palletone/common"
+//	"github.com/palletone/go-palletone/common/crypto/sha3"
+//)
+//
+//func Sha1(data []byte) string {
+//	s1 := sha1.New()
+//	s1.Write(data)
+//	return fmt.Sprintf("%x", s1.Sum(nil))
+//}
+//func Sha256(data []byte) string {
+//	s256 := sha256.New()
+//	s256.Write(data)
+//	return fmt.Sprintf("%x", s256.Sum(nil))
+//}
+//func Sha512(data []byte) string {
+//	s512 := sha512.New()
+//	s512.Write(data)
+//	return fmt.Sprintf("%x", s512.Sum(nil))
+//}
+//func Md5(data []byte) string {
+//	m5 := md5.New()
+//	m5.Write(data)
+//	return fmt.Sprintf("%x", m5.Sum(nil))
+//}
 
-	"github.com/palletone/go-palletone/common"
-	"github.com/palletone/go-palletone/common/crypto/sha3"
-	"github.com/ethereum/go-ethereum/rlp"
-)
-
-func Sha1(data []byte) string {
-	s1 := sha1.New()
-	s1.Write(data)
-	return fmt.Sprintf("%x", s1.Sum(nil))
-}
-func Sha256(data []byte) string {
-	s256 := sha256.New()
-	s256.Write(data)
-	return fmt.Sprintf("%x", s256.Sum(nil))
-}
-func Sha512(data []byte) string {
-	s512 := sha512.New()
-	s512.Write(data)
-	return fmt.Sprintf("%x", s512.Sum(nil))
-}
-func Md5(data []byte) string {
-	m5 := md5.New()
-	m5.Write(data)
-	return fmt.Sprintf("%x", m5.Sum(nil))
-}
-
-func rlpHash(x interface{}) (h common.Hash) {
-	hw := sha3.NewKeccak256()
-	rlp.Encode(hw, x)
-	hw.Sum(h[:0])
-	return h
-}
+//func rlpHash(x interface{}) (h common.Hash) {
+//	hw := sha3.NewKeccak256()
+//	rlp.Encode(hw, x)
+//	hw.Sum(h[:0])
+//	return h
+//}

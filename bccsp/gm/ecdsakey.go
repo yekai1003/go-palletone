@@ -20,10 +20,11 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/x509"
-	"errors"
+
 	"fmt"
 
 	"github.com/palletone/go-palletone/bccsp"
+	"github.com/palletone/go-palletone/bccsp/utils"
 )
 
 type ecdsaPrivateKey struct {
@@ -33,7 +34,8 @@ type ecdsaPrivateKey struct {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *ecdsaPrivateKey) Bytes() (raw []byte, err error) {
-	return nil, errors.New("Not supported.")
+	return utils.FromECDSA( k.privKey),nil
+	//return nil, errors.New("Not supported.")
 }
 
 // SKI returns the subject key identifier of this key.

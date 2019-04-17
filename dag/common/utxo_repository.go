@@ -213,7 +213,10 @@ To create utxo according to outpus in transaction, and destory utxo according to
 */
 func (repository *UtxoRepository) UpdateUtxo(txHash common.Hash, payment *modules.PaymentPayload, msgIndex uint32) error {
 	// update utxo
-	repository.destoryUtxo(payment.Inputs)
+	err := repository.destoryUtxo(payment.Inputs)
+	if err != nil {
+		return err
+	}
 	// create utxo
 	errs := repository.writeUtxo(txHash, msgIndex, payment.Outputs, payment.LockTime)
 	if len(errs) > 0 {
@@ -250,33 +253,8 @@ func (repository *UtxoRepository) writeUtxo(txHash common.Hash, msgIndex uint32,
 			errs = append(errs, err)
 			continue
 		}
-		//
-		//// write to utxo index db
-		//if dagconfig.DefaultConfig.UtxoIndex == false {
-		//	continue
-		//}
-		//
-		//// get address
+
 		sAddr, _ := tokenengine.GetAddressFromScript(txout.PkScript)
-		//// save addr key index.
-		//outpoint_key := make([]byte, 0)
-		//outpoint_key = append(outpoint_key, constants.AddrOutPoint_Prefix...)
-		//outpoint_key = append(outpoint_key, sAddr.Bytes()...)
-		//repository.idxdb.SaveIndexValue(append(outpoint_key, outpoint.Hash().Bytes()...), outpoint)
-		//
-		//utxoIndex := modules.UtxoIndex{
-		//	AccountAddr: sAddr,
-		//	Asset:       txout.Asset,
-		//	OutPoint:    outpoint,
-		//}
-		//utxoIndexVal := modules.UtxoIndexValue{
-		//	Amount:   txout.Value,
-		//	LockTime: lockTime,
-		//}
-		//if err := repository.idxdb.SaveIndexValue(utxoIndex.ToKey(), utxoIndexVal); err != nil {
-		//	log.Error("Write utxo index error: %s", err.Error())
-		//	errs = append(errs, err)
-		//}
 		//update address account info
 		gasToken := dagconfig.DagConfig.GetGasToken()
 		if txout.Asset.AssetId == gasToken {
@@ -290,7 +268,7 @@ func (repository *UtxoRepository) writeUtxo(txHash common.Hash, msgIndex uint32,
 销毁utxo
 destory utxo, delete from UTXO database
 */
-func (repository *UtxoRepository) destoryUtxo(txins []*modules.Input) {
+func (repository *UtxoRepository) destoryUtxo(txins []*modules.Input) error {
 	for _, txin := range txins {
 		//TODO for download sync
 		if txin == nil {
@@ -298,46 +276,30 @@ func (repository *UtxoRepository) destoryUtxo(txins []*modules.Input) {
 		}
 		outpoint := txin.PreviousOutPoint
 		if outpoint == nil || outpoint.IsEmpty() { //Coinbase
-			//if len(txin.Extra) > 0 {
-			//	var assetInfo modules.AssetInfo
-			//	if err := rlp.DecodeBytes(txin.Extra, &assetInfo); err == nil {
-			//		// save asset info
-			//		if err := repository.statedb.SaveAssetInfo(&assetInfo); err != nil {
-			//			log.Error("Save asset info error")
-			//		}
-			//	}
-			//}
 			continue
 		}
 		// get utxo info
 		utxo, err := repository.utxodb.GetUtxoEntry(outpoint)
 		if err != nil {
 			log.Error("Query utxo when destory uxto", "error", err.Error())
-			continue
+			return err
 		}
 
 		// delete utxo
 		if err := repository.utxodb.DeleteUtxo(outpoint); err != nil {
 			log.Error("Update uxto... ", "error", err.Error())
-			continue
+			return err
 		}
 		// delete index data
 		sAddr, _ := tokenengine.GetAddressFromScript(utxo.PkScript)
-		// addr := common.Address{}
-		// addr.SetString(sAddr.String())
-		// utxoIndex := &modules.UtxoIndex{
-		// 	AccountAddr: addr,
-		// 	Asset:       utxo.Asset,
-		// 	OutPoint:    outpoint,
-		// }
-		// if err := repository.idxdb.DeleteUtxoByIndex(utxoIndex); err != nil {
-		// 	log.Error("Destory uxto index", "error", err.Error())
-		// 	continue
-		// }
-		if utxo.Asset.AssetId == modules.NewPTNIdType() { // modules.PTNCOIN
-			repository.statedb.UpdateAccountBalance(sAddr, -int64(utxo.Amount))
+		if utxo.Asset.AssetId == dagconfig.DagConfig.GetGasToken() { // modules.PTNCOIN
+			err := repository.statedb.UpdateAccountBalance(sAddr, -int64(utxo.Amount))
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 /**
@@ -606,6 +568,7 @@ func (repository *UtxoRepository) ComputeAwards(txs []*modules.TxPoolTransaction
 		addition := new(modules.Addition)
 		//first tx's asset
 		addition.Asset = *txs[0].Tx.Asset()
+		addition.Amount = awards
 		return addition, nil
 	}
 }

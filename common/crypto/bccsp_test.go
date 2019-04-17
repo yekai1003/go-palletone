@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	//"os"
+	"fmt"
+	"github.com/palletone/go-palletone/common/log"
 	"os"
 	"testing"
 )
@@ -37,8 +39,12 @@ func TestEcdsaP256(t *testing.T) {
 	assert.Nil(t, err)
 
 	privKeyB, err := privKey.Bytes()
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
+
+	getPrivKey, err := csp.GetKey(privKey.SKI())
+	assert.Equal(t, privKey, getPrivKey)
+
 	pubKey, _ := privKey.PublicKey()
 	pubKeyB, _ := pubKey.Bytes()
 	t.Logf("PubKey:%x,len:%d, SKI:%X", pubKeyB, len(pubKeyB), pubKey.SKI())
@@ -49,6 +55,10 @@ func TestEcdsaP256(t *testing.T) {
 		t.Fatalf("Failed verifying ECDSA signature [%s]", err)
 	}
 	t.Log(valid)
+	priKey2, err := csp.KeyImport(privKeyB, &bccsp.ECDSAPrivateKeyImportOpts{Format: bccsp.ECDSAPrivateKeyFormat_Hex})
+	assert.Nil(t, err)
+	privKey2B, _ := priKey2.Bytes()
+	assert.Equal(t, privKeyB, privKey2B)
 	pubKey2, err := csp.KeyImport(pubKeyB, &bccsp.ECDSAPKIXPublicKeyImportOpts{})
 	assert.Nil(t, err)
 	t.Log(pubKey2)
@@ -84,6 +94,9 @@ func TestGmFactoryGet(t *testing.T) {
 	privKeyB, err := privKey.Bytes()
 	assert.NotNil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
+	getPrivKey, err := csp.GetKey(privKey.SKI())
+	assert.Equal(t, privKey, getPrivKey)
+
 	pubKey, _ := privKey.PublicKey()
 	pubKeyB, _ := pubKey.Bytes()
 	t.Logf("PubKey:%x,SKI:%X", pubKeyB, pubKey.SKI())
@@ -114,12 +127,15 @@ func TestS256(t *testing.T) {
 	csp, err := f.Get(opts)
 	assert.NoError(t, err)
 	assert.NotNil(t, csp)
-
+	t.Log("Try to generate new key")
 	privKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{})
 	assert.Nil(t, err)
+	getPrivKey, err := csp.GetKey(privKey.SKI())
+	assert.Equal(t, privKey, getPrivKey)
+
 	privKeyB, err := privKey.Bytes()
 
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
 	pubKey, _ := privKey.PublicKey()
 	pubKeyB, _ := pubKey.Bytes()
@@ -131,10 +147,60 @@ func TestS256(t *testing.T) {
 		t.Fatalf("Failed verifying ECDSA signature [%s]", err)
 	}
 	t.Log(valid)
+	priKey2, err := csp.KeyImport(privKeyB, &bccsp.ECDSAPrivateKeyImportOpts{Format: bccsp.ECDSAPrivateKeyFormat_Hex})
+	assert.Nil(t, err)
+	privKey2B, _ := priKey2.Bytes()
+	assert.Equal(t, privKeyB, privKey2B)
 	pubKey2, err := csp.KeyImport(pubKeyB, &bccsp.ECDSAS256PublicKeyImportOpts{})
 	assert.Nil(t, err)
-	t.Log(pubKey2)
+	t.Log(pubKey2.Bytes())
 	key3, err := csp.GetKey(pubKey.SKI())
 	assert.Nil(t, err)
-	t.Log(key3)
+	t.Log(key3.Bytes())
+}
+
+func TestMain(m *testing.M) {
+	_, err := Init(HashType_SHA3_256, CryptoType_ECDSA_P256, os.TempDir())
+	if err != nil {
+		log.Error(err.Error())
+	}
+	os.Exit(m.Run())
+}
+func TestHash(t *testing.T) {
+	str := "Devin"
+	hash := HashResult([]byte(str))
+	t.Log(hash.String())
+}
+func BenchmarkHash(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		str := fmt.Sprintf("Devin%d", i)
+		hash := HashResult([]byte(str))
+		b.Log(str, hash.String())
+	}
+}
+func TestSignByAddress(t *testing.T) {
+	hash := []byte("Devin")
+	addr, err := GenerateNewAddress()
+	assert.Nil(t, err)
+	t.Logf("New Address:%s", addr.String())
+	signature, err := SignByAddress(hash, addr)
+	assert.Nil(t, err)
+	t.Log("Signature", signature)
+
+	pubKey, err := GetPubKeyByAddress(addr)
+	assert.Nil(t, err)
+	t.Log("Public key:", pubKey)
+	pass := VerifySign(pubKey, hash, signature)
+	assert.True(t, pass)
+}
+func BenchmarkSignByAddress(b *testing.B) {
+	addr, err := GenerateNewAddress()
+	assert.Nil(b, err)
+	b.Logf("New Address:%s", addr.String())
+	for i := 0; i < b.N; i++ {
+		hash := []byte(fmt.Sprintf("Devin%d", i))
+		signature, err := SignByAddress(hash, addr)
+		assert.Nil(b, err)
+		b.Log("Signature", signature)
+	}
 }

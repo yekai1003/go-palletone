@@ -42,6 +42,7 @@ import (
 var DefaultConfig = Config{
 	SyncMode:      downloader.FastSync,
 	NetworkId:     1,
+	LightServ:     10,
 	LightPeers:    100,
 	DatabaseCache: 768,
 	TrieCache:     256,
@@ -53,6 +54,8 @@ var DefaultConfig = Config{
 	MediatorPlugin: mediatorplugin.DefaultConfig,
 	Jury:           jury.DefaultConfig,
 	Contract:       contractcfg.DefaultConfig,
+	HashType:       "SHA3_256",
+	CryptoType:     "ECDSA_P256",
 }
 
 func init() {
@@ -124,6 +127,8 @@ type Config struct {
 
 	//must be equal to the node.GasToken
 	//TokenSubProtocol string `toml:"-"`
+	HashType   string
+	CryptoType string
 }
 
 type configMarshaling struct {
