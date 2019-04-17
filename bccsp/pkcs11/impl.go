@@ -152,7 +152,7 @@ func (csp *impl) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.K
 
 // GetKey returns the key this CSP associates to
 // the Subject Key Identifier ski.
-func (csp *impl) GetKey(ski []byte) (bccsp.Key, error) {
+func (csp *impl) GetKey(ski []byte,opt bccsp.GetKeyOpts) (bccsp.Key, error) {
 	pubKey, isPriv, err := csp.getECKey(ski)
 	if err == nil {
 		if isPriv {
@@ -160,7 +160,7 @@ func (csp *impl) GetKey(ski []byte) (bccsp.Key, error) {
 		}
 		return &ecdsaPublicKey{ski, pubKey}, nil
 	}
-	return csp.BCCSP.GetKey(ski)
+	return csp.BCCSP.GetKey(ski,opt)
 }
 
 // Sign signs digest using key k.

@@ -163,12 +163,16 @@ func (opts *ECDSAPKIXPublicKeyImportOpts) Algorithm() string {
 func (opts *ECDSAPKIXPublicKeyImportOpts) Ephemeral() bool {
 	return opts.Temporary
 }
+func (opts *ECDSAPKIXPublicKeyImportOpts) ProtectPassword() []byte {
+	return nil
+}
 
 // ECDSAPrivateKeyImportOpts contains options for ECDSA secret key importation in DER format
 // or PKCS#8 format.
 type ECDSAPrivateKeyImportOpts struct {
 	Temporary bool
 	Format    ECDSAPrivateKeyFormat
+	Password []byte
 }
 type ECDSAPrivateKeyFormat byte
 
@@ -205,7 +209,9 @@ func (opts *ECDSAPrivateKeyImportOpts) Algorithm() string {
 func (opts *ECDSAPrivateKeyImportOpts) Ephemeral() bool {
 	return opts.Temporary
 }
-
+func (opts *ECDSAPrivateKeyImportOpts) ProtectPassword() []byte {
+	return opts.Password
+}
 // ECDSAGoPublicKeyImportOpts contains options for ECDSA key importation from ecdsa.PublicKey
 type ECDSAGoPublicKeyImportOpts struct {
 	Temporary bool
@@ -221,7 +227,9 @@ func (opts *ECDSAGoPublicKeyImportOpts) Algorithm() string {
 func (opts *ECDSAGoPublicKeyImportOpts) Ephemeral() bool {
 	return opts.Temporary
 }
-
+func (opts *ECDSAGoPublicKeyImportOpts) ProtectPassword() []byte {
+	return nil
+}
 // ECDSAReRandKeyOpts contains options for ECDSA key re-randomization.
 type ECDSAReRandKeyOpts struct {
 	Temporary bool
@@ -368,7 +376,9 @@ func (opts *GMSM2PublicKeyImportOpts) Algorithm() string {
 func (opts *GMSM2PublicKeyImportOpts) Ephemeral() bool {
 	return opts.Temporary
 }
-
+func (opts *GMSM2PublicKeyImportOpts) ProtectPassword() []byte {
+	return nil
+}
 // HMACImportKeyOpts contains options for importing HMAC keys.
 type HMACImportKeyOpts struct {
 	Temporary bool
@@ -425,7 +435,9 @@ func (opts *RSAGoPublicKeyImportOpts) Algorithm() string {
 func (opts *RSAGoPublicKeyImportOpts) Ephemeral() bool {
 	return opts.Temporary
 }
-
+func (opts *RSAGoPublicKeyImportOpts) ProtectPassword() []byte {
+	return nil
+}
 // X509PublicKeyImportOpts contains options for importing public keys from an x509 certificate
 type X509PublicKeyImportOpts struct {
 	Temporary bool
@@ -455,4 +467,17 @@ func (opts *ECDSAS256PublicKeyImportOpts) Algorithm() string {
 // false otherwise.
 func (opts *ECDSAS256PublicKeyImportOpts) Ephemeral() bool {
 	return opts.Temporary
+}
+
+
+func (opts *ECDSAS256PublicKeyImportOpts) ProtectPassword() []byte {
+	return nil
+}
+
+type ECDSAGetKeyOpts struct {
+	Password  []byte
+}
+
+func (opts *ECDSAGetKeyOpts) ProtectPassword() []byte {
+	return opts.Password
 }

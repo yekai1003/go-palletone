@@ -76,6 +76,7 @@ type KeyImportOpts interface {
 	// Ephemeral returns true if the key generated has to be ephemeral,
 	// false otherwise.
 	Ephemeral() bool
+	ProtectPassword() []byte
 }
 
 // HashOpts contains options for hashing with a CSP.
@@ -83,6 +84,9 @@ type HashOpts interface {
 
 	// Algorithm returns the hash algorithm identifier (to be used).
 	Algorithm() string
+}
+type GetKeyOpts interface{
+	ProtectPassword() []byte
 }
 
 // SignerOpts contains options for signing with a CSP.
@@ -113,7 +117,7 @@ type BCCSP interface {
 
 	// GetKey returns the key this CSP associates to
 	// the Subject Key Identifier ski.
-	GetKey(ski []byte) (k Key, err error)
+	GetKey(ski []byte,opts GetKeyOpts) (k Key, err error)
 
 	// Hash hashes messages msg using options opts.
 	// If opts is nil, the default hash function will be used.

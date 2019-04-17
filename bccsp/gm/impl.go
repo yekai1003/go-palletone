@@ -215,7 +215,12 @@ func (csp *impl) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.K
 }
 
 //根据SKI返回与该接口实例有联系的key
-func (csp *impl) GetKey(ski []byte) (k bccsp.Key, err error) {
+func (csp *impl) GetKey(ski []byte,opts bccsp.GetKeyOpts) (k bccsp.Key, err error) {
+	pwd:=opts.ProtectPassword()
+	if len(pwd)>0{
+		csp.ks.SetPassword(pwd)
+		defer func(){csp.ks.SetPassword(nil)}()
+	}
 	k, err = csp.ks.GetKey(ski)
 	if err != nil {
 		return nil, fmt.Errorf("Failed getting key for SKI [%v]", ski)

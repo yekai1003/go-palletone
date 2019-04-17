@@ -18,8 +18,10 @@ package sw
 import (
 	"crypto/ecdsa"
 	"crypto/x509"
+
 	//"errors"
 	"fmt"
+
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/palletone/go-palletone/bccsp"
 	"github.com/palletone/go-palletone/bccsp/utils"
@@ -34,7 +36,11 @@ type ecdsaPrivateKey struct {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *ecdsaPrivateKey) Bytes() ([]byte, error) {
-	return utils.FromECDSA( k.privKey),nil
+	if k.privKey.Curve == btcec.S256() {
+		return utils.FromECDSA(k.privKey), nil
+	} else {
+		return x509.MarshalECPrivateKey(k.privKey)
+	}
 	//return nil, errors.New("Not supported.")
 }
 

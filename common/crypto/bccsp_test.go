@@ -7,9 +7,10 @@ import (
 
 	//"os"
 	"fmt"
-	"github.com/palletone/go-palletone/common/log"
 	"os"
 	"testing"
+
+	"github.com/palletone/go-palletone/common/log"
 )
 
 func TestEcdsaP256(t *testing.T) {
@@ -42,7 +43,7 @@ func TestEcdsaP256(t *testing.T) {
 	assert.Nil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
 
-	getPrivKey, err := csp.GetKey(privKey.SKI())
+	getPrivKey, err := csp.GetKey(privKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: []byte("1")})
 	assert.Equal(t, privKey, getPrivKey)
 
 	pubKey, _ := privKey.PublicKey()
@@ -55,16 +56,17 @@ func TestEcdsaP256(t *testing.T) {
 		t.Fatalf("Failed verifying ECDSA signature [%s]", err)
 	}
 	t.Log(valid)
-	priKey2, err := csp.KeyImport(privKeyB, &bccsp.ECDSAPrivateKeyImportOpts{Format: bccsp.ECDSAPrivateKeyFormat_Hex})
+	priKey2, err := csp.KeyImport(privKeyB, &bccsp.ECDSAPrivateKeyImportOpts{Format: bccsp.ECDSAPrivateKeyFormat_DER, Password: []byte("2")})
 	assert.Nil(t, err)
 	privKey2B, _ := priKey2.Bytes()
 	assert.Equal(t, privKeyB, privKey2B)
-	pubKey2, err := csp.KeyImport(pubKeyB, &bccsp.ECDSAPKIXPublicKeyImportOpts{})
+	pubKey2, err := csp.KeyImport(pubKeyB, &bccsp.ECDSAPKIXPublicKeyImportOpts{Temporary: true})
 	assert.Nil(t, err)
 	t.Log(pubKey2)
-	key3, err := csp.GetKey(pubKey.SKI())
-	assert.Nil(t, err)
-	t.Log(key3)
+	key3, err := csp.GetKey(pubKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: []byte("3")})
+	assert.NotNil(t, err)
+	assert.Nil(t, key3)
+	//t.Logf("PrivKey:%#v", key3)
 }
 func TestGmFactoryGet(t *testing.T) {
 	f := &factory.GMFactory{}
@@ -94,7 +96,7 @@ func TestGmFactoryGet(t *testing.T) {
 	privKeyB, err := privKey.Bytes()
 	assert.NotNil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
-	getPrivKey, err := csp.GetKey(privKey.SKI())
+	getPrivKey, err := csp.GetKey(privKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: []byte("1")})
 	assert.Equal(t, privKey, getPrivKey)
 
 	pubKey, _ := privKey.PublicKey()
@@ -130,7 +132,7 @@ func TestS256(t *testing.T) {
 	t.Log("Try to generate new key")
 	privKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{Password: []byte("1")})
 	assert.Nil(t, err)
-	getPrivKey, err := csp.GetKey(privKey.SKI())
+	getPrivKey, err := csp.GetKey(privKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: []byte("1")})
 	assert.Equal(t, privKey, getPrivKey)
 
 	privKeyB, err := privKey.Bytes()
@@ -154,7 +156,7 @@ func TestS256(t *testing.T) {
 	pubKey2, err := csp.KeyImport(pubKeyB, &bccsp.ECDSAS256PublicKeyImportOpts{})
 	assert.Nil(t, err)
 	t.Log(pubKey2.Bytes())
-	key3, err := csp.GetKey(pubKey.SKI())
+	key3, err := csp.GetKey(pubKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: []byte("1")})
 	assert.Nil(t, err)
 	t.Log(key3.Bytes())
 }

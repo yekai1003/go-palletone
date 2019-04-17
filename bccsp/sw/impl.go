@@ -86,6 +86,7 @@ func (csp *CSP) KeyGen(opts bccsp.KeyGenOpts) (k bccsp.Key, err error) {
 		pwd := opts.ProtectPassword()
 		if pwd != nil && len(pwd) > 0 {
 			csp.ks.SetPassword(pwd)
+			defer func(){csp.ks.SetPassword(nil)}()
 		}
 		err = csp.ks.StoreKey(k)
 		if err != nil {
@@ -153,6 +154,11 @@ func (csp *CSP) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Ke
 	// If the key is not Ephemeral, store it.
 	if !opts.Ephemeral() {
 		// Store the key
+		pwd:=opts.ProtectPassword()
+		if len(pwd)>0{
+			csp.ks.SetPassword(pwd)
+			defer func(){csp.ks.SetPassword(nil)}()
+		}
 		err = csp.ks.StoreKey(k)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed storing imported key with opts [%v]", opts)
@@ -164,7 +170,12 @@ func (csp *CSP) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Ke
 
 // GetKey returns the key this CSP associates to
 // the Subject Key Identifier ski.
-func (csp *CSP) GetKey(ski []byte) (k bccsp.Key, err error) {
+func (csp *CSP) GetKey(ski []byte,opts bccsp.GetKeyOpts) (k bccsp.Key, err error) {
+	pwd:=opts.ProtectPassword()
+	if len(pwd)>0{
+		csp.ks.SetPassword(pwd)
+		defer func(){csp.ks.SetPassword(nil)}()
+	}
 	k, err = csp.ks.GetKey(ski)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed getting key for SKI [%v]", ski)

@@ -166,7 +166,7 @@ func (lib *CryptoLib) SignByAddress(hash []byte, addr common.Address) ([]byte, e
 	}
 	ski := addr.Bytes()
 	log.Debugf("Try get key by ski:%x", ski)
-	prvKey, err := lib.csp.GetKey(ski)
+	prvKey, err := lib.csp.GetKey(ski,&bccsp.ECDSAGetKeyOpts{Password:[]byte("1")})
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (lib *CryptoLib) GetPubKeyByAddress(addr common.Address) ([]byte, error) {
 	if pubkey, ok := lib.cacheAddrPubKey[addr]; ok {
 		return pubkey.Bytes()
 	}
-	key, err := lib.csp.GetKey(addr.Bytes())
+	key, err := lib.csp.GetKey(addr.Bytes(),&bccsp.ECDSAGetKeyOpts{Password:[]byte("1")})
 	if err != nil {
 		return nil, err
 	}
