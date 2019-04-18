@@ -138,11 +138,11 @@ func (ks keyStorePassphrase) StoreKeySm2(filename string, key *sm2.PrivateKey, a
 	}
 	// Atomic write: create a temporary hidden file first
 	// then move it into place. TempFile assigns mode 0600.
-	_, err := ioutil.TempFile(filepath.Dir(filename), "."+filepath.Base(filename)+".tmp")
+	/*_, err := ioutil.TempFile(filepath.Dir(filename), "."+filepath.Base(filename)+".tmp")
 	if err != nil {
 		return err
-	}
-	_, err = sm2.WritePrivateKeytoPem(filename, key, []byte(auth))
+	}*/
+	_, err := sm2.WritePrivateKeytoPem(filename, key, []byte(auth))
 	if err != nil {
 		fmt.Println("密钥对写入文件错误！！！")
 		return err
