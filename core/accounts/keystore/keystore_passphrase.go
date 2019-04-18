@@ -36,6 +36,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	//"strconv"
+	"os"
 
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
@@ -131,7 +132,17 @@ func (ks keyStorePassphrase) StoreKeySm2(filename string, key *sm2.PrivateKey, a
 
 	fmt.Println("------keyStorePassphrase-StoreKeySm2-------------------129----")
 	fmt.Println("filename is ", filename)
-	_, err := sm2.WritePrivateKeytoPem(filename, key, []byte(auth))
+	const dirPerm = 0700
+	if err := os.MkdirAll(filepath.Dir(filename), dirPerm); err != nil {
+		return err
+	}
+	// Atomic write: create a temporary hidden file first
+	// then move it into place. TempFile assigns mode 0600.
+	_, err := ioutil.TempFile(filepath.Dir(filename), "."+filepath.Base(filename)+".tmp")
+	if err != nil {
+		return err
+	}
+	_, err = sm2.WritePrivateKeytoPem(filename, key, []byte(auth))
 	if err != nil {
 		fmt.Println("密钥对写入文件错误！！！")
 		return err

@@ -921,9 +921,7 @@ func (ks *Sm2KeyStore) GetPublicKey(address common.Address) ([]byte, error) {
 		return nil, ErrLocked
 	}
 	ukey := unlockedKey.Key.PublicKey
-	//pk,_ := unlockedKey.Key.PublicKey.Bytes()
 	return crypto.CompressPubkeySm2(&ukey), nil
-	//return nil, ErrLocked
 }
 
 func (ks *KeyStore) SigUnit(unitHeader *modules.Header, address common.Address) ([]byte, error) {
