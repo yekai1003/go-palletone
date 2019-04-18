@@ -455,9 +455,16 @@ func (ks *Sm2KeyStore) SignHash(addr common.Address, hash []byte) ([]byte, error
 	if !found {
 		return nil, ErrLocked
 	}
-	unlockedKey = unlockedKey
-	// Sign the hash using plain ECDSA operations
-	return nil, ErrLocked
+	priv := unlockedKey.Key
+	sign, err := priv.Sign(crand.Reader, hash, nil)
+	if err != nil {
+			return nil, ErrLocked
+		}
+	if true != priv.Verify(hash, sign) {// 密钥验证
+		// Sign the hash using plain ECDSA operations
+		return nil, ErrLocked
+    }
+    return sign ,err
 }
 
 // SignTx signs the given transaction with the requested account.

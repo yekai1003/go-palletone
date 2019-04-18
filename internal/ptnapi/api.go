@@ -2149,14 +2149,14 @@ func (s *PublicTransactionPoolAPI) SignRawTransaction(ctx context.Context, param
 
 	getPubKeyFn := func(addr common.Address) ([]byte, error) {
 		//TODO use keystore
-		ks := s.b.GetKeyStore()
+		ks := s.b.GetSm2KeyStore()
 
 		return ks.GetPublicKey(addr)
 		//privKey, _ := ks.DumpPrivateKey(account, "1")
 		//return crypto.CompressPubkey(&privKey.PublicKey), nil
 	}
 	getSignFn := func(addr common.Address, hash []byte) ([]byte, error) {
-		ks := s.b.GetKeyStore()
+		ks := s.b.GetSm2KeyStore()
 		//account, _ := MakeAddress(ks, addr.String())
 		//privKey, _ := ks.DumpPrivateKey(account, "1")
 		return ks.SignHash(addr, hash)
@@ -2207,7 +2207,7 @@ func (s *PublicTransactionPoolAPI) SignRawTransaction(ctx context.Context, param
 	} else {
 		d = time.Duration(*duration) * time.Second
 	}
-	ks := s.b.GetKeyStore()
+	ks := s.b.GetSm2KeyStore()
 	err = ks.TimedUnlock(accounts.Account{Address: addr}, password, d)
 	if err != nil {
 		newErr := errors.New("get addr by outpoint get err:" + err.Error())
