@@ -364,6 +364,7 @@ func GetUnitWithSigSm2(unit *modules.Unit, ks *keystore.Sm2KeyStore, signer comm
 		return unit, err1
 	}
 	pubKey, err := ks.GetPublicKey(signer)
+	fmt.Printf("----GetUnitWithSigSm2--------pubKey-------is %+v\n",pubKey)
 	if err != nil {
 		return nil, err
 	}
