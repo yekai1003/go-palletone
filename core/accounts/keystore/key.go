@@ -44,9 +44,8 @@ type Key struct {
 	Address common.Address
 	// we only store privkey as pubkey/address can be derived from it
 	// privkey in this struct is always in plaintext
-	PrivateKey *ecdsa.PrivateKey
+	PrivateKey  *ecdsa.PrivateKey
 	PrivateKeyB []byte
-
 }
 
 type keyStore interface {
@@ -159,16 +158,29 @@ func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
 // 	return key
 // }
 
-func newKey(rand io.Reader) (*Key, error) {
-	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
+//func newKey(rand io.Reader) (*Key, error) {
+//	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return newKeyFromECDSA(privateKeyECDSA), nil
+//}
+func newKey() (*Key, error) {
+	privKeyB, pubKeyB, err := crypto.GenerateNewKey()
+
 	if err != nil {
 		return nil, err
 	}
-	return newKeyFromECDSA(privateKeyECDSA), nil
+	id := uuid.NewRandom()
+	key := &Key{
+		Id:          id,
+		Address:     crypto.PubkeyBytesToAddress(pubKeyB),
+		PrivateKeyB: privKeyB,
+	}
+	return key, nil
 }
-
 func storeNewKey(ks keyStore, rand io.Reader, auth string) (*Key, accounts.Account, error) {
-	key, err := newKey(rand)
+	key, err := newKey()
 	if err != nil {
 		return nil, accounts.Account{}, err
 	}

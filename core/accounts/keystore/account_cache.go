@@ -17,10 +17,8 @@
 package keystore
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"os"
+
 	"path/filepath"
 	"sort"
 	"strings"
@@ -241,33 +239,36 @@ func (ac *accountCache) scanAccounts() error {
 		return nil
 	}
 	// Create a helper method to scan the contents of the key files
-	var (
-		buf = new(bufio.Reader)
-		key struct {
-			Address string `json:"address"`
-		}
-	)
+	//var (
+	//	buf = new(bufio.Reader)
+	//	key struct {
+	//		Address string `json:"address"`
+	//	}
+	//)
 	readAccount := func(path string) *accounts.Account {
-		fd, err := os.Open(path)
-		if err != nil {
-			log.Trace("Failed to open keystore file", "path", path, "err", err)
-			return nil
-		}
-		defer fd.Close()
-		buf.Reset(fd)
-		// Parse the address.
-		key.Address = ""
-		err = json.NewDecoder(buf).Decode(&key)
-		addr := common.HexToAddress(key.Address)
-		switch {
-		case err != nil:
-			log.Debug("Failed to decode keystore key", "path", path, "err", err)
-		case (addr == common.Address{}):
-			log.Debug("Failed to decode keystore key", "path", path, "err", "missing or zero address")
-		default:
-			return &accounts.Account{Address: addr, URL: accounts.URL{Scheme: KeyStoreScheme, Path: path}}
-		}
-		return nil
+		_, filename := filepath.Split(path)
+		fileArray := strings.Split(filename, "_")
+		addr, _ := common.StringToAddress(fileArray[0])
+		//fd, err := os.Open(path)
+		//if err != nil {
+		//	log.Trace("Failed to open keystore file", "path", path, "err", err)
+		//	return nil
+		//}
+		//defer fd.Close()
+		//buf.Reset(fd)
+		//// Parse the address.
+		//key.Address = ""
+		//err = json.NewDecoder(buf).Decode(&key)
+		//addr := common.HexToAddress(key.Address)
+		//switch {
+		//case err != nil:
+		//	log.Debug("Failed to decode keystore key", "path", path, "err", err)
+		//case (addr == common.Address{}):
+		//	log.Debug("Failed to decode keystore key", "path", path, "err", "missing or zero address")
+		//default:
+		return &accounts.Account{Address: addr, URL: accounts.URL{Scheme: KeyStoreScheme, Path: path}}
+		//}
+		//return nil
 	}
 	// Process all the file diffs
 	start := time.Now()

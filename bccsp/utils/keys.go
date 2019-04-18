@@ -191,12 +191,17 @@ func PrivateKeyToEncryptedPEM(privateKey interface{}, pwd []byte) ([]byte, error
 		if k == nil {
 			return nil, errors.New("Invalid ecdsa private key. It must be different from nil.")
 		}
-		raw, err := x509.MarshalECPrivateKey(k)
+		var raw []byte
+		var err error
+		if k.Curve == btcec.S256() {
+			raw = FromECDSA(k)
+		} else {
+			raw, err = x509.MarshalECPrivateKey(k)
 
-		if err != nil {
-			return nil, err
+			if err != nil {
+				return nil, err
+			}
 		}
-
 		block, err := x509.EncryptPEMBlock(
 			rand.Reader,
 			"PRIVATE KEY",
