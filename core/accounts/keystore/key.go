@@ -32,9 +32,9 @@ import (
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/core/accounts"
 	"github.com/pborman/uuid"
-	"crypto/elliptic"
+	//"crypto/elliptic"
 	"github.com/tjfoc/gmsm/sm2"
-	"crypto/sha256"
+	//"crypto/sha256"
 )
 
 const (
@@ -187,7 +187,8 @@ func sm2storeNewKey(ks sm2keyStore, rand io.Reader, auth string) (*sm2.PrivateKe
 	if err != nil {
 		return nil, accounts.Account{}, err
 	}
-	publicKey := &privateKey.PublicKey
+	addr := crypto.PubkeyToAddressSm2(&privateKey.PublicKey)
+	/*publicKey := &privateKey.PublicKey
 	raw := elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y)
     // Hash it
     hash := sha256.New()
@@ -197,7 +198,7 @@ func sm2storeNewKey(ks sm2keyStore, rand io.Reader, auth string) (*sm2.PrivateKe
     addr ,err := common.StringToAddress(saddr)
     if err != nil {
 		return nil, accounts.Account{}, err
-	}
+	}*/
 	a := accounts.Account{Address: addr, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(addr))}}
 	if err := ks.StoreKeySm2(a.URL.Path, privateKey, auth); err != nil {
 		//ZeroKey(key.PrivateKey)

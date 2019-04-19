@@ -26,6 +26,7 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/math"
+	"github.com/tjfoc/gmsm/sm2"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -207,6 +208,10 @@ func ValidateSignatureValues(v byte, r, s *big.Int, homestead bool) bool {
 //This is only for P2PKH account address.
 func PubkeyToAddress(p *ecdsa.PublicKey) common.Address {
 	pubBytes := CompressPubkey(p)
+	return PubkeyBytesToAddress(pubBytes)
+}
+func PubkeyToAddressSm2(p *sm2.PublicKey) common.Address {
+	pubBytes := CompressPubkeySm2(p)
 	return PubkeyBytesToAddress(pubBytes)
 }
 func PubkeyBytesToAddress(pubKeyCompressBytes []byte) common.Address {
