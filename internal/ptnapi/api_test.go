@@ -19,6 +19,11 @@
 package ptnapi
 
 import (
+	"fmt"
+	"log"
+	"testing"
+	"github.com/tjfoc/gmsm/sm2"
+        "crypto/rand"
 //"fmt"
 //"eggncoding/json"
 //"github.com/palletone/go-palletone/ptnjson"
@@ -29,7 +34,26 @@ import (
 //"github.com/shopspring/decimal"
 // "github.com/palletone/go-palletone/tokenengine/btcd/btcjson"
 )
-
+func TestSm2Sign(t *testing.T) {
+	fmt.Println("1234567------------")
+	msg := []byte("test")
+	priv, err := sm2.GenerateKey() // 生成密钥对
+	if err != nil {
+		log.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		sign, err := priv.Sign(rand.Reader, msg, nil) // 签名
+		if err != nil {
+			log.Fatal(err)
+		}
+		ok :=priv.Verify(msg, sign) // 密钥验证
+		if ok != true {
+		 	fmt.Printf("Verify error\n")
+		 } else {
+		 	fmt.Printf("Verify ok\n")
+		 }
+	}
+}
 //func TestHex(t *testing.T) {
 //	str := "ptn"
 //	hex := hexutil.Encode([]byte(str))

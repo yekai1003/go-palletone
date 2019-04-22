@@ -42,7 +42,7 @@ func TestSignHash(t *testing.T) {
 		t.Error("No Pass")
 	}
 
-	for index, input := range RawTxjsonGenParams.Payload[0].Inputs {
+	for index, _ := range RawTxjsonGenParams.Payload[0].Inputs {
 
 		//hash := common.HexToHash(input.HashForSign)
         hash := common.HexToHash("21d0b6842031caea51e4c7a7ebb373ccadee3f47b839f6da2c44032e6d6e5ce1")
