@@ -26,7 +26,7 @@ import (
 	"sort"
 
 	"fmt"
-	"github.com/tjfoc/gmsm/sm2"
+	//"github.com/tjfoc/gmsm/sm2"
 	"github.com/tjfoc/gmsm/sm3"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
@@ -254,14 +254,15 @@ func (a *accountsm2) Hash(msg []byte) ([]byte, error) {
 func (a *accountsm2) Sign(address common.Address, digest []byte) ([]byte, error) {
 	return a.signFn(address, digest)
 }
-func (a *accountsm2) Verify( pubKey *sm2.PublicKey, signature, digest []byte) (bool, error) {
-	ok := pubKey.Verify(digest, signature) // 公钥验证
+func (a *accountsm2) Verify( pubKey , signature, digest []byte) (bool, error) {
+	/*ok := pubKey.Verify(digest, signature) // 公钥验证
 	if ok != true {
 		fmt.Printf("Verify error\n")
 	} else {
 		fmt.Printf("Verify ok\n")
 	}
-	return ok, nil
+	return ok, nil*/
+	return crypto.VerifySignature(pubKey, digest, signature), nil
 }
 func (a *accountsm2) GetPubKey(address common.Address) ([]byte, error) {
 	return a.pubKeyFn(address)
@@ -284,13 +285,13 @@ func CalcSignatureHash(tx *modules.Transaction, hashType uint32, msgIdx, inputId
 
 //Sign a full transaction
 func SignTxAllPaymentInput(tx *modules.Transaction, hashType uint32, utxoLockScripts map[modules.OutPoint][]byte,
-	redeemScript []byte, pubKeyFn AddressGetPubKey, hashFn AddressGetSign) ([]common.SignatureError, error) {
+	redeemScript []byte, pubKeyFn AddressGetPubKeySm2, hashFn AddressGetSignSm2) ([]common.SignatureError, error) {
 
 	lookupRedeemScript := func(a common.Address) ([]byte, error) {
 
 		return redeemScript, nil
 	}
-	tmpAcc := &account{pubKeyFn: pubKeyFn, signFn: hashFn}
+	tmpAcc := &accountsm2{pubKeyFn: pubKeyFn, signFn: hashFn}
 	var signErrors []common.SignatureError
 	for i, msg := range tx.TxMessages {
 		if msg.App == modules.APP_PAYMENT {

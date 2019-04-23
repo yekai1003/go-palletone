@@ -1620,7 +1620,7 @@ func createTokenTx(fromAddr, toAddr common.Address, amountToken uint64, feePTN u
 
 //sign raw tx
 func signTokenTx(tx *modules.Transaction, cmdInputs []ptnjson.RawTxInput, flags string,
-	pubKeyFn tokenengine.AddressGetPubKey, hashFn tokenengine.AddressGetSign) error {
+	pubKeyFn tokenengine.AddressGetPubKeySm2, hashFn tokenengine.AddressGetSignSm2) error {
 	var hashType uint32
 	switch flags {
 	case "ALL":
@@ -1891,7 +1891,7 @@ func (s *PublicTransactionPoolAPI) CreateRawTransaction(ctx context.Context, par
 }*/
 
 //sign rawtranscation
-func SignRawTransaction(icmd interface{}, pubKeyFn tokenengine.AddressGetPubKey, hashFn tokenengine.AddressGetSign, addr common.Address) (ptnjson.SignRawTransactionResult, error) {
+func SignRawTransaction(icmd interface{}, pubKeyFn tokenengine.AddressGetPubKeySm2, hashFn tokenengine.AddressGetSignSm2, addr common.Address) (ptnjson.SignRawTransactionResult, error) {
 	cmd := icmd.(*ptnjson.SignRawTransactionCmd)
 	serializedTx, err := decodeHexStr(cmd.RawTx)
 	if err != nil {
