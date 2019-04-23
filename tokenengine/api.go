@@ -26,6 +26,8 @@ import (
 	"sort"
 
 	"fmt"
+	"github.com/tjfoc/gmsm/sm2"
+	"github.com/tjfoc/gmsm/sm3"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/log"
@@ -47,6 +49,8 @@ const (
 type AddressGetSign func(common.Address, []byte) ([]byte, error)
 type AddressGetPubKey func(common.Address) ([]byte, error)
 
+type AddressGetSignSm2 func(common.Address, []byte) ([]byte, error)
+type AddressGetPubKeySm2 func(common.Address) ([]byte, error)
 //Generate a P2PKH lock script, just only need input 20bytes public key hash.
 //You can use Address.Bytes() to get address hash.
 func GenerateP2PKHLockScript(pubKeyHash []byte) []byte {
@@ -238,6 +242,30 @@ func (a *account) GetPubKey(address common.Address) ([]byte, error) {
 	return a.pubKeyFn(address)
 }
 
+type accountsm2 struct {
+	pubKeyFn AddressGetPubKeySm2
+	signFn   AddressGetSignSm2
+}
+func (a *accountsm2) Hash(msg []byte) ([]byte, error) {
+	hw := sm3.New()
+	hw.Sum(nil)
+	return sm3.Sm3Sum(msg),nil 
+}
+func (a *accountsm2) Sign(address common.Address, digest []byte) ([]byte, error) {
+	return a.signFn(address, digest)
+}
+func (a *accountsm2) Verify( pubKey *sm2.PublicKey, signature, digest []byte) (bool, error) {
+	ok := pubKey.Verify(digest, signature) // 公钥验证
+	if ok != true {
+		fmt.Printf("Verify error\n")
+	} else {
+		fmt.Printf("Verify ok\n")
+	}
+	return ok, nil
+}
+func (a *accountsm2) GetPubKey(address common.Address) ([]byte, error) {
+	return a.pubKeyFn(address)
+}
 //func (a *account) GetSignFunction(addr common.Address) txscript.SignHash {
 //	signFn := func(hash []byte) ([]byte, error) {
 //		return a.hashFn(addr, hash)
