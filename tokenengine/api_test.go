@@ -22,7 +22,7 @@ package tokenengine
 
 import (
 	"testing"
-
+        "crypto/rand"
 	//"github.com/palletone/go-palletone/tokenengine/btcd/chaincfg/chainhash"
 	"encoding/hex"
 	"fmt"
@@ -32,10 +32,11 @@ import (
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/tokenengine/internal/txscript"
 	"github.com/stretchr/testify/assert"
+        "github.com/tjfoc/gmsm/sm2"
 )
 
 func TestGetAddressFromScript(t *testing.T) {
-	addrStr := "P1JEStL6tb7TB8e6ZJSpJhQoqin2A6pabdA"
+	addrStr := "P1NPKiEkzBhrmQoHVEnNnVmuzsdyyLaBkBG"
 	addr, _ := common.StringToAddress(addrStr)
 	p2pkhLock := GenerateP2PKHLockScript(addr.Bytes())
 	t.Logf("P2PKH script:%x", p2pkhLock)
@@ -132,6 +133,79 @@ func TestSignAndVerifyATx(t *testing.T) {
 	var hashtype uint32
 	hashtype = 1
 	_, err := SignTxAllPaymentInput(tx, hashtype, lockScripts, nil, getPubKeyFn, getSignFn)
+	if err != nil {
+		t.Logf("Sign error:%s", err)
+	}
+	unlockScript := tx.TxMessages[0].Payload.(*modules.PaymentPayload).Inputs[0].SignatureScript
+	t.Logf("UnlockScript:%x", unlockScript)
+	s, _ := DisasmString(unlockScript)
+	t.Logf("UnlockScript string:%s", s)
+	err = ScriptValidate(lockScript, nil, tx, 0, 0)
+	if err != nil {
+		t.Logf("validate error:%s", err)
+	}
+	// textPayload :=tx.TxMessages[2].Payload.(*modules.DataPayload)
+	//textPayload.Text=[]byte("Bad")
+	//fmt.Printf("%s", tx.TxMessages[2].Payload.(*modules.DataPayload))
+
+	err = ScriptValidate(lockScript, nil, tx, 1, 0)
+	assert.Nil(t, err, fmt.Sprintf("validate error:%s", err))
+
+}
+
+func TestSm2SignAndVerifyATx(t *testing.T) {
+        privateKey, err := sm2.GenerateKey()
+	if err != nil {
+		 t.Logf("get privken is err")
+	}
+	pubKey := privateKey.PublicKey
+	pubKeyBytes := crypto.CompressPubkeySm2(&pubKey)
+	pubKeyHash := crypto.Hash160(pubKeyBytes)
+	t.Logf("Public Key:%x", pubKeyBytes)
+	addr := crypto.PubkeyToAddressSm2(&privateKey.PublicKey)
+	t.Logf("Addr:%s", addr.String())
+	lockScript := GenerateP2PKHLockScript(pubKeyHash)
+	t.Logf("UTXO lock script:%x", lockScript)
+
+	tx := &modules.Transaction{
+		TxMessages: make([]*modules.Message, 0),
+	}
+	payment := &modules.PaymentPayload{}
+	utxoTxId := common.HexToHash("5651870aa8c894376dbd960a22171d0ad7be057a730e14d7103ed4a6dbb34873")
+	outPoint := modules.NewOutPoint(utxoTxId, 0, 0)
+	txIn := modules.NewTxIn(outPoint, []byte{})
+	payment.AddTxIn(txIn)
+	asset0 := &modules.Asset{}
+	payment.AddTxOut(modules.NewTxOut(1, lockScript, asset0))
+	payment2 := &modules.PaymentPayload{}
+	utxoTxId2 := common.HexToHash("1651870aa8c894376dbd960a22171d0ad7be057a730e14d7103ed4a6dbb34873")
+	outPoint2 := modules.NewOutPoint(utxoTxId2, 1, 1)
+	txIn2 := modules.NewTxIn(outPoint2, []byte{})
+	payment2.AddTxIn(txIn2)
+	asset1 := &modules.Asset{AssetId: modules.PTNCOIN}
+	payment2.AddTxOut(modules.NewTxOut(1, lockScript, asset1))
+	tx.TxMessages = append(tx.TxMessages, modules.NewMessage(modules.APP_PAYMENT, payment))
+	tx.TxMessages = append(tx.TxMessages, modules.NewMessage(modules.APP_PAYMENT, payment2))
+	tx.TxMessages = append(tx.TxMessages, modules.NewMessage(modules.APP_DATA, &modules.DataPayload{MainData: []byte("Hello PalletOne")}))
+
+	lockScripts := map[modules.OutPoint][]byte{
+		*outPoint:  lockScript[:],
+		*outPoint2: GenerateP2PKHLockScript(pubKeyHash),
+	}
+	getPubKeyFn := func(common.Address) ([]byte, error) {
+		return crypto.CompressPubkeySm2(&privateKey.PublicKey), nil
+	}
+	getSignFn := func(addr common.Address, hash []byte) ([]byte, error) {
+		sign, err := privateKey.Sign(rand.Reader, hash, nil) // 签名
+		if err != nil {
+                     t.Logf("getsignfn is err")
+		}
+		//s, e := crypto.Sign(hash, privKey)
+		return sign[0:64], err  
+	}
+	var hashtype uint32
+	hashtype = 1
+	_, err = SignTxAllPaymentInput(tx, hashtype, lockScripts, nil, getPubKeyFn, getSignFn)
 	if err != nil {
 		t.Logf("Sign error:%s", err)
 	}
