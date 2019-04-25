@@ -42,13 +42,6 @@ const (
 	ADAPTER_EVENT_RESULT                   = 2
 )
 
-type ElectionInf struct {
-	VData     []byte      //vrf data
-	AddrHash  common.Hash //common.Address将地址hash后，返回给请求节点
-	Proof     []byte      //vrf proof
-	PublicKey []byte      //alg.PublicKey, rlp not support
-}
-
 type AdapterInf struct {
 	JuryMsgAll map[string]*MsgSigCollect
 }
@@ -60,10 +53,14 @@ type JuryMsgSig struct {
 	Signature []byte
 	Answer    []byte
 }
+type JuryMsgAddr struct {
+	Address string
+	Answer  []byte
+}
 
 //contract
 type ContractEvent struct {
-	Ele []ElectionInf
+	Ele []modules.ElectionInf
 
 	CType ContractEventType
 	Tx    *modules.Transaction
@@ -76,7 +73,7 @@ type ElectionRequestEvent struct {
 }
 type ElectionResultEvent struct {
 	ReqId common.Hash
-	Ele   ElectionInf
+	Ele   modules.ElectionInf
 }
 type ElectionEvent struct {
 	EType ElectionEventType `json:"etype"`

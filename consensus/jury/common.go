@@ -97,8 +97,35 @@ func checkAndAddSigSet(local *modules.Transaction, recv *modules.Transaction) er
 	return errors.New("checkAndAddSigSet add sig fail")
 }
 
+func createContractErrorPayloadMsg(reqType modules.MessageType, contractReq interface{}, errMsg string) *modules.Message {
+	err := modules.ContractError{
+		Code:    500, //todo
+		Message: errMsg,
+	}
+	switch reqType {
+	case modules.APP_CONTRACT_TPL_REQUEST:
+		req := contractReq.(ContractInstallReq)
+		payload := modules.NewContractTplPayload(nil, req.ccName, req.ccPath, req.ccVersion, 0, nil, err)
+		return modules.NewMessage(modules.APP_CONTRACT_TPL, payload)
+	case modules.APP_CONTRACT_DEPLOY_REQUEST:
+		req := contractReq.(ContractDeployReq)
+		payload := modules.NewContractDeployPayload(req.templateId, nil, "", req.args, nil, nil, nil, err)
+		return modules.NewMessage(modules.APP_CONTRACT_DEPLOY, payload)
+	case modules.APP_CONTRACT_INVOKE_REQUEST:
+		req := contractReq.(ContractInvokeReq)
+		payload := modules.NewContractInvokePayload(req.deployId, "", req.args, 0, nil, nil, nil, err)
+		return modules.NewMessage(modules.APP_CONTRACT_INVOKE, payload)
+	case modules.APP_CONTRACT_STOP_REQUEST:
+		req := contractReq.(ContractStopReq)
+		payload := modules.NewContractStopPayload(req.deployId, nil, nil, err)
+		return modules.NewMessage(modules.APP_CONTRACT_STOP, payload)
+	}
+
+	return nil
+}
+
 //执行合约命令:install、deploy、invoke、stop，同时只支持一种类型
-func runContractCmd(dag iDag, contract *contracts.Contract, tx *modules.Transaction) ([]*modules.Message, error) {
+func runContractCmd(dag iDag, contract *contracts.Contract, tx *modules.Transaction, elf []modules.ElectionInf, errMsgEnable bool) ([]*modules.Message, error) {
 	if tx == nil || len(tx.TxMessages) <= 0 {
 		return nil, errors.New("runContractCmd transaction or msg is nil")
 	}
@@ -117,6 +144,11 @@ func runContractCmd(dag iDag, contract *contracts.Contract, tx *modules.Transact
 				installResult, err := ContractProcess(contract, req)
 				if err != nil {
 					log.Error("runContractCmd ContractProcess ", "error", err.Error())
+					if errMsgEnable {
+						errMsg := createContractErrorPayloadMsg(modules.APP_CONTRACT_TPL_REQUEST, req, err.Error())
+						msgs = append(msgs, errMsg)
+						return msgs, nil
+					}
 					return nil, errors.New(fmt.Sprintf("runContractCmd APP_CONTRACT_TPL_REQUEST txid(%s) err:%s", req.ccName, err))
 				}
 				payload := installResult.(*modules.ContractTplPayload)
@@ -137,9 +169,17 @@ func runContractCmd(dag iDag, contract *contracts.Contract, tx *modules.Transact
 				deployResult, err := ContractProcess(contract, req)
 				if err != nil {
 					log.Error("runContractCmd ContractProcess ", "error", err.Error())
+					if errMsgEnable {
+						errMsg := createContractErrorPayloadMsg(modules.APP_CONTRACT_DEPLOY_REQUEST, req, err.Error())
+						msgs = append(msgs, errMsg)
+						return msgs, nil
+					}
 					return nil, errors.New(fmt.Sprintf("runContractCmd APP_CONTRACT_DEPLOY_REQUEST TplId(%s) err:%s", req.templateId, err))
 				}
 				payload := deployResult.(*modules.ContractDeployPayload)
+				if len(elf) > 0 {
+					payload.EleList = elf
+				}
 				msgs = append(msgs, modules.NewMessage(modules.APP_CONTRACT_DEPLOY, payload))
 				return msgs, nil
 			}
@@ -167,11 +207,15 @@ func runContractCmd(dag iDag, contract *contracts.Contract, tx *modules.Transact
 				invokeResult, err := ContractProcess(contract, req)
 				if err != nil {
 					log.Error("runContractCmd ContractProcess", "ContractProcess error", err.Error())
+					if errMsgEnable {
+						errMsg := createContractErrorPayloadMsg(modules.APP_CONTRACT_INVOKE_REQUEST, req, err.Error())
+						msgs = append(msgs, errMsg)
+						return msgs, nil
+					}
 					return nil, errors.New(fmt.Sprintf("runContractCmd APP_CONTRACT_INVOKE txid(%s) rans err:%s", req.txid, err))
 				}
 				result := invokeResult.(*modules.ContractInvokeResult)
-				payload := modules.NewContractInvokePayload(result.ContractId, result.FunctionName, result.Args, 0 /*result.ExecutionTime*/ , result.ReadSet, result.WriteSet, result.Payload)
-
+				payload := modules.NewContractInvokePayload(result.ContractId, result.FunctionName, result.Args, 0 /*result.ExecutionTime*/, result.ReadSet, result.WriteSet, result.Payload, modules.ContractError{})
 				if payload != nil {
 					msgs = append(msgs, modules.NewMessage(modules.APP_CONTRACT_INVOKE, payload))
 				}
@@ -208,6 +252,11 @@ func runContractCmd(dag iDag, contract *contracts.Contract, tx *modules.Transact
 				stopResult, err := ContractProcess(contract, req)
 				if err != nil {
 					log.Error("runContractCmd ContractProcess ", "error", err.Error())
+					if errMsgEnable {
+						errMsg := createContractErrorPayloadMsg(modules.APP_CONTRACT_STOP_REQUEST, req, err.Error())
+						msgs = append(msgs, errMsg)
+						return msgs, nil
+					}
 					return nil, errors.New(fmt.Sprintf("runContractCmd APP_CONTRACT_STOP_REQUEST contractId(%s) err:%s", req.deployId, err))
 				}
 				payload := stopResult.(*modules.ContractStopPayload)
@@ -284,28 +333,21 @@ func handleArg1(tx *modules.Transaction, reqArgs [][]byte) ([][]byte, error) {
 	if len(reqArgs) <= 1 {
 		return nil, fmt.Errorf("handlemsg1 req args error")
 	}
-	certInfo := modules.CertInfo{}
-	if len(tx.CertId) > 0 {
-		certInfo.NeedCert = true
-		certInfo.Certid = tx.CertId
-	} else {
-		certInfo.NeedCert = false
-	}
-	val, err := json.Marshal(certInfo)
-	if err != nil {
-		return nil, err
-	}
+
 	newReqArgs := [][]byte{}
 	newReqArgs = append(newReqArgs, reqArgs[0])
-	newReqArgs = append(newReqArgs, val)
+	newReqArgs = append(newReqArgs, tx.CertId)
 	newReqArgs = append(newReqArgs, reqArgs[1:]...)
 	return newReqArgs, nil
 }
 
 func checkAndAddTxSigMsgData(local *modules.Transaction, recv *modules.Transaction) (bool, error) {
 	var recvSigMsg *modules.Message
-
-	if local == nil || recv == nil {
+	if local == nil {
+		log.Info("checkAndAddTxSigMsgData, local sig msg not exist")
+		return false, nil
+	}
+	if recv == nil {
 		return false, errors.New("checkAndAddTxSigMsgData param is nil")
 	}
 	if len(local.TxMessages) != len(recv.TxMessages) {
@@ -461,14 +503,15 @@ func getContractTxType(tx *modules.Transaction) (modules.MessageType, error) {
 
 func getContractTxContractInfo(tx *modules.Transaction, msgType modules.MessageType) (interface{}, error) {
 	if tx == nil {
-		return modules.APP_UNKNOW, errors.New("getContractTxType get param is nil")
+		return nil, errors.New("getContractTxType get param is nil")
 	}
 	for _, msg := range tx.TxMessages {
 		if msg.App == msgType {
 			return msg.Payload, nil
 		}
 	}
-	return modules.APP_UNKNOW, errors.New("getContractTxContractInfo not find")
+	log.Debug("getContractTxContractInfo", " not find msgType", msgType)
+	return nil, nil
 }
 
 func getElectionSeedData(in common.Hash) ([]byte, error) {
@@ -514,7 +557,7 @@ func electionWeightValue(total uint64) (val uint64) {
 		return 15
 	} else if total > 200 && total <= 500 {
 		return 17
-	}else if total >500{
+	} else if total > 500 {
 		return 20
 	}
 	return 4

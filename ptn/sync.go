@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
-	minDesiredPeerCount = 5                // Amount of peers desired to start syncing
+	forceSyncCycle      = 5 * time.Second // Time interval to force syncs, even if few peers are available
+	minDesiredPeerCount = 5               //5                // Amount of peers desired to start syncing
 
 	// This is the target size for the packs of transactions sent by txsyncLoop.
 	// A pack can get larger than this if a single transactions exceeds this size.
@@ -142,9 +142,9 @@ func (pm *ProtocolManager) syncer() {
 	defer pm.fetcher.Stop()
 	defer pm.downloader.Terminate()
 
-	pm.lightFetcher.Start()
-	defer pm.lightFetcher.Stop()
-	defer pm.lightdownloader.Terminate()
+	//pm.lightFetcher.Start()
+	//defer pm.lightFetcher.Stop()
+	//defer pm.lightdownloader.Terminate()
 
 	// Wait for different events to fire synchronisation operations
 	forceSync := time.NewTicker(forceSyncCycle)
@@ -186,9 +186,10 @@ func (pm *ProtocolManager) syncall() {
 	if pm.SubProtocols[0].Name != ProtocolName {
 		return
 	}
-	pm.lightsync(peer)
+	//pm.lightsync(peer)
 }
 
+/*
 func (pm *ProtocolManager) lightsync(peer *peer) {
 	if peer == nil {
 		log.Debug("ProtocolManager lightsync peer is nil")
@@ -205,7 +206,7 @@ func (pm *ProtocolManager) lightsync(peer *peer) {
 		pm.lightsynchronise(peer, header.ChainIndex().AssetID)
 	}
 }
-
+*/
 // synchronise tries to sync up our local block chain with a remote peer.
 func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.AssetId) {
 	// Short circuit if no peers are available
@@ -232,6 +233,10 @@ func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.AssetId) {
 	}
 
 	if index >= pindex && pindex > 0 && err == nil {
+		if atomic.LoadUint32(&pm.fastSync) == 1 {
+			log.Debug("Fast sync complete, auto disabling")
+			atomic.StoreUint32(&pm.fastSync, 0)
+		}
 		atomic.StoreUint32(&pm.acceptTxs, 1)
 		log.Debug("Do not need synchronise", "local peer.index:", pindex, "local index:", number.Index, "header hash:", pHead)
 		return
@@ -267,6 +272,7 @@ func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.AssetId) {
 	}
 }
 
+/*
 func (pm *ProtocolManager) lightsynchronise(peer *peer, assetId modules.AssetId) {
 	// Short circuit if no peers are available
 	if peer == nil {
@@ -307,7 +313,7 @@ func (pm *ProtocolManager) lightsynchronise(peer *peer, assetId modules.AssetId)
 		go pm.BroadcastLocalLightHeader(head)
 	}
 }
-
+*/
 func (pm *ProtocolManager) getMaxNodes(headers []*modules.Header, assetId modules.AssetId) (*modules.Header, error) {
 	size := len(headers)
 	if size == 0 {

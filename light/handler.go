@@ -25,12 +25,14 @@ import (
 	"net"
 	"sync"
 
+	"encoding/json"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/event"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/p2p"
 	"github.com/palletone/go-palletone/common/p2p/discover"
 	"github.com/palletone/go-palletone/dag"
+	dagerrors "github.com/palletone/go-palletone/dag/errors"
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/ptn/downloader"
 )
@@ -100,7 +102,7 @@ type ProtocolManager struct {
 	retriever *retrieveManager
 
 	downloader *downloader.Downloader
-	fetcher    *lightFetcher
+	fetcher    *LightFetcher
 	peers      *peerSet
 	maxPeers   int
 
@@ -116,13 +118,13 @@ type ProtocolManager struct {
 	// wait group is used for graceful shutdowns during downloading
 	// and processing
 	wg *sync.WaitGroup
+	//SPV
+	spvTxChn chan reqSpvData
 }
-
-type producer interface{}
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Palletone sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(lightSync bool, mode downloader.SyncMode, networkId uint64, gasToken modules.AssetId, txpool txPool,
+func NewProtocolManager(lightSync bool, peers *peerSet, networkId uint64, gasToken modules.AssetId, txpool txPool,
 	dag dag.IDag, mux *event.TypeMux, genesis *modules.Unit) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
@@ -138,11 +140,12 @@ func NewProtocolManager(lightSync bool, mode downloader.SyncMode, networkId uint
 		networkId: networkId,
 		txpool:    txpool,
 		//txrelay:     txrelay,
-		peers:     newPeerSet(),
+		peers:     peers, //newPeerSet(),
 		newPeerCh: make(chan *peer),
 		//quitSync:    quitSync,
 		wg:          new(sync.WaitGroup),
 		noMorePeers: make(chan struct{}),
+		spvTxChn:    make(chan reqSpvData, 50),
 	}
 
 	// Initiate a sub-protocol for every implemented version we can handle
@@ -180,7 +183,7 @@ func NewProtocolManager(lightSync bool, mode downloader.SyncMode, networkId uint
 				}
 			},
 			NodeInfo: func() interface{} {
-				return manager.NodeInfo()
+				return manager.NodeInfo(genesis.Hash())
 			},
 			PeerInfo: func(id discover.NodeID) interface{} {
 				if p := manager.peers.Peer(fmt.Sprintf("%x", id[:8])); p != nil {
@@ -199,13 +202,69 @@ func NewProtocolManager(lightSync bool, mode downloader.SyncMode, networkId uint
 		removePeer = func(id string) {}
 	}
 
-	if lightSync {
+	if manager.lightSync {
 		manager.downloader = downloader.New(downloader.LightSync, manager.eventMux, removePeer, nil, dag, nil)
 		manager.peers.notify((*downloaderPeerNotify)(manager))
-		manager.fetcher = newLightFetcher(manager)
+		manager.fetcher = manager.newLightFetcher()
 	}
 
 	return manager, nil
+}
+
+func (pm *ProtocolManager) newLightFetcher() *LightFetcher {
+	headerVerifierFn := func(header *modules.Header) error {
+		//hash := header.Hash()
+		//log.Debugf("Importing propagated block insert DAG Enter ValidateUnitExceptGroupSig, unit: %s", hash.String())
+		//defer log.Debugf("Importing propagated block insert DAG End ValidateUnitExceptGroupSig, unit: %s", hash.String())
+		//verr := pm.dag.ValidateUnitExceptGroupSig(unit)
+		//if verr != nil && !validator.IsOrphanError(verr) {
+		//	return dagerrors.ErrFutureBlock
+		//}
+		//TODO must modify
+		return dagerrors.ErrFutureBlock
+	}
+	headerBroadcaster := func(header *modules.Header, propagate bool) {
+		log.Info("ProtocolManager headerBroadcaster", "hash:", header.Hash().String())
+		pm.BroadcastLightHeader(header)
+	}
+	inserter := func(headers []*modules.Header) (int, error) {
+		// If fast sync is running, deny importing weird blocks
+		//TODO must add lock
+		//if pm.lightSync {
+		//	log.Warn("Discarded lighting sync propagated block", "number", headers[0].Number.Index, "hash", headers[0].Hash())
+		//	return 0, errors.New("fasting sync")
+		//}
+		log.Debug("light Fetcher", "manager.dag.InsertDag index:", headers[0].Number.Index, "hash", headers[0].Hash())
+		return pm.dag.InsertLightHeader(headers)
+	}
+	return newLightFetcher(pm.dag.GetHeaderByHash, pm.dag.GetLightChainHeight, headerVerifierFn,
+		headerBroadcaster, inserter, pm.removePeer)
+}
+
+func (pm *ProtocolManager) BroadcastLightHeader(header *modules.Header) {
+	log.Info("ProtocolManager", "BroadcastLightHeader index:", header.Index(), "sub protocal name:", header.Number.AssetID.String())
+	peers := pm.peers.PeersWithoutHeader(header.Hash())
+	announce := announceData{Hash: header.Hash(), Number: *header.Number, Header: *header}
+	for _, p := range peers {
+		if p == nil {
+			continue
+		}
+		log.Debug("Light Palletone", "BroadcastLightHeader announceType", p.announceType)
+		switch p.announceType {
+		case announceTypeNone:
+			select {
+			case p.announceChn <- announce:
+			default:
+				pm.removePeer(p.id)
+			}
+		case announceTypeSimple:
+
+		case announceTypeSigned:
+
+		}
+	}
+	log.Trace("BroadcastLightHeader Propagated header", "protocalname", pm.SubProtocols[0].Name, "index:", header.Number.Index, "hash", header.Hash(), "recipients", len(peers))
+	return
 }
 
 // removePeer initiates disconnection from a peer by removing it from the peer set
@@ -213,11 +272,22 @@ func (pm *ProtocolManager) removePeer(id string) {
 	pm.peers.Unregister(id)
 }
 
+//func (pm *ProtocolManager) loopProof() {
+//	for {
+//		select {
+//		case pm.announceChn <- announce:
+//		case <-pm.quitSync:
+//			return
+//		}
+//	}
+//}
+
 func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.maxPeers = maxPeers
 
 	if pm.lightSync {
 		go pm.syncer()
+
 	} else {
 		go func() {
 			for range pm.newPeerCh {
@@ -324,7 +394,15 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		for {
 			select {
 			case announce := <-p.announceChn:
-				p.SendAnnounce(announce)
+				log.Debug("Light Palletone ProtocolManager->handle", "announce", announce)
+				data, err := json.Marshal(announce.Header)
+				if err != nil {
+					log.Error("Light Palletone ProtocolManager->handle", "Marshal err", err, "announce", announce)
+				} else {
+					//p.SetHead(&announce)
+					p.headInfo = &announce
+					p.SendRawAnnounce(data)
+				}
 			case <-stop:
 				return
 			}
@@ -334,7 +412,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	// main loop. handle incoming messages.
 	for {
 		if err := pm.handleMsg(p); err != nil {
-			log.Debug("Light Palletone message handling failed", "err", err)
+			log.Debug("Light PalletOne message handling failed", "err", err)
 			return err
 		}
 	}
@@ -521,23 +599,32 @@ func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
 // known about the host peer.
 type NodeInfo struct {
 	Network uint64      `json:"network"` // Palletone network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
-	Number  uint64      `json:"number"`  // Total difficulty of the host's blockchain
+	Index   uint64      `json:"number"`  // Total difficulty of the host's blockchain
 	Head    common.Hash `json:"head"`    // SHA3 hash of the host's best owned block
-	//Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
+	Genesis common.Hash `json:"genesis"` // SHA3 hash of the host's genesis block
 	//Config     *params.ChainConfig `json:"config"`     // Chain configuration for the fork rules
 }
 
 // NodeInfo retrieves some protocol metadata about the running host node.
-func (self *ProtocolManager) NodeInfo() *NodeInfo {
-	//head := self.blockchain.CurrentHeader()
-	//hash := head.Hash()
+func (self *ProtocolManager) NodeInfo(genesisHash common.Hash) *NodeInfo {
+	header := self.dag.CurrentHeader(self.assetId)
+
+	var (
+		index = uint64(0)
+		hash  = common.Hash{}
+	)
+	if header != nil {
+		index = header.Number.Index
+		hash = header.Hash()
+	} else {
+		log.Debug("Light PalletOne NodeInfo header is nil")
+	}
 
 	return &NodeInfo{
 		Network: self.networkId,
-		Number:  uint64(0),
-		//Genesis:    self.blockchain.Genesis().Hash(),
-		//Config:     self.blockchain.Config(),
-		//Head: hash,
+		Index:   index,
+		Genesis: genesisHash,
+		Head:    hash,
 	}
 }
 
@@ -548,67 +635,45 @@ type peerConnection struct {
 	peer    *peer
 }
 
-func (pc *peerConnection) Head() (common.Hash, *big.Int) {
-	return common.Hash{}, nil
-	// return pc.peer.HeadAndTd()
+//Head(modules.AssetId) (common.Hash, *modules.ChainIndex)
+//RequestHeadersByHash(common.Hash, int, int, bool) error
+//RequestHeadersByNumber(*modules.ChainIndex, int, int, bool) error
+//RequestDagHeadersByHash(common.Hash, int, int, bool) error
+//RequestLeafNodes() error
+
+func (pc *peerConnection) Head(assetId modules.AssetId) (common.Hash, *modules.ChainIndex) {
+	//return common.Hash{}, nil
+	return pc.peer.HeadAndNumber()
 }
 
 func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
-	return nil
-	//reqID := genReqID()
-	//rq := &distReq{
-	//	getCost: func(dp distPeer) uint64 {
-	//		peer := dp.(*peer)
-	//		return peer.GetRequestCost(GetBlockHeadersMsg, amount)
-	//	},
-	//	canSend: func(dp distPeer) bool {
-	//		return dp.(*peer) == pc.peer
-	//	},
-	//	request: func(dp distPeer) func() {
-	//		peer := dp.(*peer)
-	//		cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
-	//		peer.fcServer.QueueRequest(reqID, cost)
-	//		return func() { peer.RequestHeadersByHash(reqID, cost, origin, amount, skip, reverse) }
-	//	},
-	//}
-	//_, ok := <-pc.manager.reqDist.queue(rq)
-	//if !ok {
-	//	return ErrNoPeers
-	//}
-	//return nil
+	log.Debug("peerConnection batch of headers by hash", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
+	return p2p.Send(pc.peer.rw, GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
-func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool) error {
-	//reqID := genReqID()
-	//rq := &distReq{
-	//	getCost: func(dp distPeer) uint64 {
-	//		peer := dp.(*peer)
-	//		return peer.GetRequestCost(GetBlockHeadersMsg, amount)
-	//	},
-	//	canSend: func(dp distPeer) bool {
-	//		return dp.(*peer) == pc.peer
-	//	},
-	//	request: func(dp distPeer) func() {
-	//		peer := dp.(*peer)
-	//		cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
-	//		peer.fcServer.QueueRequest(reqID, cost)
-	//		return func() { peer.RequestHeadersByNumber(reqID, cost, origin, amount, skip, reverse) }
-	//	},
-	//}
-	//_, ok := <-pc.manager.reqDist.queue(rq)
-	//if !ok {
-	//	return ErrNoPeers
-	//}
+func (pc *peerConnection) RequestHeadersByNumber(origin *modules.ChainIndex, amount int, skip int, reverse bool) error {
+	log.Debug("peerConnection batch of headers by number", "count", amount, "from origin", origin, "skip", skip, "reverse", reverse)
+	return p2p.Send(pc.peer.rw, GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: *origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
+}
+func (p *peerConnection) RequestDagHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
+	//log.Debug("Fetching batch of headers", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
 	return nil
+}
+
+func (p *peerConnection) RequestLeafNodes() error {
+	//GetLeafNodes
+	log.Debug("Fetching leaf nodes")
+	return nil
+	//return p2p.Send(p.rw, GetLeafNodesMsg, "")
 }
 
 func (d *downloaderPeerNotify) registerPeer(p *peer) {
-	//pm := (*ProtocolManager)(d)
-	//pc := &peerConnection{
-	//	manager: pm,
-	//	peer:    p,
-	//}
-	//pm.downloader.RegisterLightPeer(p.id, ethVersion, pc)
+	pm := (*ProtocolManager)(d)
+	pc := &peerConnection{
+		manager: pm,
+		peer:    p,
+	}
+	pm.downloader.RegisterLightPeer(p.id, p.version, pc)
 }
 
 func (d *downloaderPeerNotify) unregisterPeer(p *peer) {

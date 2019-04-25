@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/palletone/go-palletone/common/crypto"
-
 	"github.com/palletone/go-palletone/common/p2p/discover"
+	"golang.org/x/crypto/sha3"
 )
 
 func init() {

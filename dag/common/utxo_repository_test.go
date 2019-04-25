@@ -31,6 +31,7 @@ import (
 	"github.com/palletone/go-palletone/dag/dagconfig"
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/dag/storage"
+	"time"
 )
 
 func mockUtxoRepository() *UtxoRepository {
@@ -43,14 +44,14 @@ func mockUtxoRepository() *UtxoRepository {
 
 func TestUpdateUtxo(t *testing.T) {
 	rep := mockUtxoRepository()
-	rep.UpdateUtxo(common.Hash{}, &modules.PaymentPayload{}, uint32(0))
+	rep.UpdateUtxo(time.Now().Unix(), common.Hash{}, &modules.PaymentPayload{}, uint32(0))
 }
 
-func TestReadUtxos(t *testing.T) {
-	rep := mockUtxoRepository()
-	utxos, totalAmount := rep.ReadUtxos(common.Address{}, modules.Asset{})
-	log.Println(utxos, totalAmount)
-}
+//func TestReadUtxos(t *testing.T) {
+//	rep := mockUtxoRepository()
+//	utxos, totalAmount := rep.ReadUtxos(common.Address{}, modules.Asset{})
+//	log.Println(utxos, totalAmount)
+//}
 
 func TestGetUxto(t *testing.T) {
 	dagconfig.DagConfig.DbPath = getTempDir(t)

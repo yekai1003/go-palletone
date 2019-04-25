@@ -67,7 +67,7 @@ type iDag interface {
 
 	IsActiveMediator(add common.Address) bool
 	IsSynced() bool
-
+	LookupAccount() map[common.Address]*modules.AccountInfo
 	ValidateUnitExceptGroupSig(unit *modules.Unit) error
 	SetUnitGroupSign(unitHash common.Hash, groupSign []byte, txpool txspool.ITxPool) error
 
@@ -80,10 +80,11 @@ type iDag interface {
 	IsIrreversibleUnit(hash common.Hash) bool
 
 	CurrentFeeSchedule() core.FeeSchedule
+	GenTransferPtnTx(from, to common.Address, daoAmount uint64, text *string, txPool txspool.ITxPool) (*modules.Transaction, uint64, error)
+
 	GenMediatorCreateTx(account common.Address, op *modules.MediatorCreateOperation,
 		txPool txspool.ITxPool) (*modules.Transaction, uint64, error)
-	GenVoteMediatorTx(voter, mediator common.Address, txPool txspool.ITxPool) (*modules.Transaction, uint64, error)
-
+	GenVoteMediatorTx(mediator common.Address, rawtx *modules.Transaction) (*modules.Transaction, error)
 	GetMediators() map[common.Address]bool
 	IsMediator(address common.Address) bool
 
@@ -102,8 +103,8 @@ type iDag interface {
 	MediatorParticipationRate() uint32
 
 	GetAccountInfo(addr common.Address) *modules.AccountInfo
-	GenSetDesiredMediatorCountTx(account common.Address, desiredMediatorCount uint8,
-		txPool txspool.ITxPool) (*modules.Transaction, uint64, error)
+	//GenSetDesiredMediatorCountTx(account common.Address, desiredMediatorCount uint8,
+	//	txPool txspool.ITxPool) (*modules.Transaction, uint64, error)
 	GetChainParameters() core.ChainParameters
 }
 
@@ -199,7 +200,7 @@ func (mp *MediatorPlugin) ScheduleProductionLoop() {
 		println("No mediators configured! Please add mediator and private keys to configuration.")
 	} else {
 		// 2. 开启循环生产计划
-		log.Info(fmt.Sprintf("Launching unit production for %v mediators.", len(mp.mediators)))
+		log.Infof("Launching unit production for %v mediators.", len(mp.mediators))
 
 		if mp.productionEnabled {
 			dag := mp.dag
@@ -337,7 +338,7 @@ func RegisterMediatorPluginService(stack *node.Node, cfg *Config) {
 	})
 
 	if err != nil {
-		log.Debug(fmt.Sprintf("failed to register the Mediator Plugin service: %v", err))
+		log.Debug("failed to register the Mediator Plugin service: %v", err)
 	}
 }
 
@@ -360,11 +361,11 @@ func NewMediatorPlugin(ptn PalletOne, dag iDag, cfg *Config) (*MediatorPlugin, e
 		}
 
 		addr := medAcc.Address
-		log.Debug(fmt.Sprintf("this node control mediator account address: %v", addr.Str()))
+		log.Debugf("this node control mediator account address: %v", addr.Str())
 
 		msm[addr] = medAcc
 	}
-	log.Debug(fmt.Sprintf("This node controls %v mediators.", len(msm)))
+	log.Debugf("This node controls %v mediators.", len(msm))
 
 	mp := MediatorPlugin{
 		ptn:  ptn,

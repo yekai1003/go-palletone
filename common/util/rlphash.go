@@ -19,7 +19,7 @@
 package util
 
 import (
-	"crypto/sha256"
+	// "crypto/sha256"
 	"encoding/json"
 	"fmt"
 
@@ -41,7 +41,7 @@ func RHashStr(x interface{}) string {
 	if err != nil {
 		return ""
 	}
-	s256 := sha256.New()
+	s256, _ := crypto.GetHash()
 	s256.Write(x_byte)
 	return fmt.Sprintf("%x", s256.Sum(nil))
 }
@@ -51,7 +51,7 @@ func RHashBytes(x interface{}) []byte {
 	if err != nil {
 		return []byte("")
 	}
-	s256 := sha256.New()
+	s256, _ := crypto.GetHash()
 	s256.Write(x_byte)
 	return s256.Sum(nil)
 }

@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/palletone/go-palletone/common/log"
+	"github.com/palletone/go-palletone/dag/storage"
 )
 
 func mockUnitRepository() *UnitRepository {
@@ -119,7 +120,7 @@ func TestSaveUnit(t *testing.T) {
 	header.Authors = *auth
 	contractTplPayload := modules.NewContractTplPayload([]byte("contract_template0000"),
 		"TestContractTpl", "./contract", "1.1.1", 1024,
-		[]byte{175, 52, 23, 180, 156, 109, 17, 232, 166, 226, 84, 225, 173, 184, 229, 159})
+		[]byte{175, 52, 23, 180, 156, 109, 17, 232, 166, 226, 84, 225, 173, 184, 229, 159}, modules.ContractError{})
 	readSet := []modules.ContractReadSet{}
 	readSet = append(readSet, modules.ContractReadSet{Key: "name", Version: &modules.StateVersion{
 		Height:  &modules.ChainIndex{},
@@ -136,7 +137,7 @@ func TestSaveUnit(t *testing.T) {
 		},
 	}
 	deployPayload := modules.NewContractDeployPayload([]byte("contract_template0000"), []byte("contract0000"),
-		"testDeploy", nil, 10, nil, readSet, writeSet)
+		"testDeploy", nil, nil, readSet, writeSet, modules.ContractError{})
 
 	invokePayload := &modules.ContractInvokePayload{
 		ContractId: []byte("contract0000"),
@@ -148,10 +149,8 @@ func TestSaveUnit(t *testing.T) {
 				Value: modules.ToPayloadMapValueBytes("Alice"),
 			},
 			{
-				Key: "age",
-				Value: modules.ToPayloadMapValueBytes(modules.DelContractState{
-					IsDelete: true,
-				}),
+				Key:      "age",
+				IsDelete: true,
 			},
 		},
 	}
@@ -440,7 +439,7 @@ func TestContractDeployPayloadTransactionRLP(t *testing.T) {
 		Name:       "testdeploy",
 		Args:       [][]byte{[]byte{1, 2, 3}, []byte{4, 5, 6}},
 		//ExecutionTime: et,
-		Jury:     []common.Address{addr},
+		//Jury:     []common.Address{addr},
 		ReadSet:  readSet,
 		WriteSet: writeSet,
 	}
@@ -503,7 +502,7 @@ func creatFeeTx(isContractTx bool, pubKey [][]byte, amount uint64, aid modules.A
 			sigs = append(sigs, sigSet)
 		}
 		conSig := &modules.Message{
-			App: modules.APP_CONTRACT_INVOKE,
+			App: modules.APP_CONTRACT_STOP_REQUEST,
 		}
 		msgSig := &modules.Message{
 			App: modules.APP_SIGNATURE,
@@ -536,41 +535,41 @@ func TestComputeTxFees(t *testing.T) {
 
 	//1
 	pks = [][]byte{
-		{0x01}, {0x02}, {0x03}, {0x04}}
+		{0x01}, {0x02}, {0x03}, {0x04}, {0x05}}
 	aId = modules.AssetId{'p', 't', 'n'}
-	tx = creatFeeTx(true, pks, 100, aId)
+	tx = creatFeeTx(true, pks, 10, aId)
 	txs = append(txs, tx)
 
 	//	log.Info("TestComputeTxFees", "txs:", tx)
+	/*
+		//2
+		pks = [][]byte{
+			{0x01}, {0x02}, {0x03}, {0x04}}
+		aId = modules.AssetId{'p', 't', 'n'}
+		tx = creatFeeTx(true, pks, 10, aId)
+		txs = append(txs, tx)
 
-	//2
-	pks = [][]byte{
-		{0x01}, {0x02}, {0x03}, {0x04}}
-	aId = modules.AssetId{'p', 't', 'n'}
-	tx = creatFeeTx(true, pks, 10, aId)
-	txs = append(txs, tx)
+		//3
+		pks = [][]byte{
+			{0x05}, {0x06}, {0x07}, {0x08}}
+		aId = modules.AssetId{'p', 't', 'n'}
+		tx = creatFeeTx(true, pks, 10, aId)
+		txs = append(txs, tx)
 
-	//3
-	pks = [][]byte{
-		{0x05}, {0x06}, {0x07}, {0x08}}
-	aId = modules.AssetId{'p', 't', 'n'}
-	tx = creatFeeTx(true, pks, 10, aId)
-	txs = append(txs, tx)
+		//4
+		pks = [][]byte{
+			{0x01}, {0x02}, {0x03}, {0x04}}
+		aId = modules.AssetId{'a', 'b', 'c'}
+		tx = creatFeeTx(true, pks, 10, aId)
+		txs = append(txs, tx)
 
-	//4
-	pks = [][]byte{
-		{0x01}, {0x02}, {0x03}, {0x04}}
-	aId = modules.AssetId{'a', 'b', 'c'}
-	tx = creatFeeTx(true, pks, 10, aId)
-	txs = append(txs, tx)
-
-	//5
-	pks = [][]byte{
-		{0x01}, {0x02}, {0x03}, {0x04}}
-	aId = modules.AssetId{'a', 'b', 'c'}
-	tx = creatFeeTx(true, pks, 10, aId)
-	txs = append(txs, tx)
-
+		//5
+		pks = [][]byte{
+			{0x01}, {0x02}, {0x03}, {0x04}}
+		aId = modules.AssetId{'a', 'b', 'c'}
+		tx = creatFeeTx(true, pks, 10, aId)
+		txs = append(txs, tx)
+	*/
 	//log.Info("TestComputeTxFees", "txs:", txs)
 	ads, err := ComputeTxFees(&m, txs)
 	log.Info("TestComputeTxFees", "txs:", ads)
@@ -582,5 +581,37 @@ func TestComputeTxFees(t *testing.T) {
 			log.Debug("TestComputeTxFees", "coinbase", coinbase, "rewards", rewards)
 		}
 	}
+}
 
+func TestContractStateVrf(t *testing.T) {
+	contractId := []byte("TestContractVrf")
+	eleW := []modules.ElectionInf{
+		{
+			Proof:     []byte("abc"),
+			PublicKey: []byte("def"),
+		},
+	}
+	ver := &modules.StateVersion{Height: &modules.ChainIndex{Index: 123}, TxIndex: 1}
+	log.Debug("TestContractStateVrf", "ElectionInf", eleW)
+
+	db, _ := ptndb.NewMemDatabase()
+	statedb := storage.NewStateDb(db)
+	eleW_bytes, _ := rlp.EncodeToBytes(eleW)
+	//write
+	ws := modules.NewWriteSet("ElectionList", eleW_bytes)
+	if statedb.SaveContractState(contractId, ws, ver) != nil {
+		log.Debug("TestContractStateVrf, SaveContractState fail")
+		return
+	}
+
+	//read
+	eleByte, _, err := statedb.GetContractState(contractId, "ElectionList")
+	if err != nil {
+		log.Debug("TestContractStateVrf, GetContractState fail", "error", err)
+		return
+	}
+	var eler []modules.ElectionInf
+	err1 := rlp.DecodeBytes(eleByte, &eler)
+	log.Infof("%v", err1)
+	log.Infof("%v", eler)
 }

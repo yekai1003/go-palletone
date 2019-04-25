@@ -232,7 +232,7 @@ func TestContractTplPayload_Rlp(t *testing.T) {
 
 func newTestContractTpl() *ContractTplPayload {
 	pay := &ContractTplPayload{}
-	pay = NewContractTplPayload([]byte("1"), "test", "test", "test", 123, []byte("test"))
+	pay = NewContractTplPayload([]byte("1"), "test", "test", "test", 123, []byte("test"), ContractError{})
 
 	return pay
 }
@@ -284,7 +284,7 @@ func newTestContractInvokeResult() *ContractInvokePayload {
 	b := []byte("BBBBBBBBBBB")
 	args := [][]byte{a, b, nil}
 
-	version := &StateVersion{&ChainIndex{PTNCOIN, true, 100}, 2}
+	version := &StateVersion{&ChainIndex{PTNCOIN, 100}, 2}
 	read1 := ContractReadSet{"A", version, []byte("This is value")}
 	readset := []ContractReadSet{read1}
 	write1 := ContractWriteSet{false, "Key1", []byte("This is value2")}
@@ -296,7 +296,6 @@ func newTestContractInvokeResult() *ContractInvokePayload {
 		Args:         args,
 		ReadSet:      readset,
 		WriteSet:     wset,
-		ErrorCode:    0,
 	}
 
 	return pay

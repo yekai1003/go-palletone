@@ -9,6 +9,7 @@ import (
 	common "github.com/palletone/go-palletone/common"
 	event "github.com/palletone/go-palletone/common/event"
 	discover "github.com/palletone/go-palletone/common/p2p/discover"
+	list "github.com/palletone/go-palletone/contracts/list"
 	core "github.com/palletone/go-palletone/core"
 	modules "github.com/palletone/go-palletone/dag/modules"
 	txspool "github.com/palletone/go-palletone/dag/txspool"
@@ -326,18 +327,19 @@ func (mr *MockIDagMockRecorder) GetTransactionOnly(hash interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransactionOnly", reflect.TypeOf((*MockIDag)(nil).GetTransactionOnly), hash)
 }
 
-// HasTransaction mocks base method
-func (m *MockIDag) HasTransaction(hash common.Hash) bool {
+// IsTransactionExist mocks base method
+func (m *MockIDag) IsTransactionExist(hash common.Hash) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasTransaction", hash)
+	ret := m.ctrl.Call(m, "IsTransactionExist", hash)
 	ret0, _ := ret[0].(bool)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// HasTransaction indicates an expected call of HasTransaction
-func (mr *MockIDagMockRecorder) HasTransaction(hash interface{}) *gomock.Call {
+// IsTransactionExist indicates an expected call of IsTransactionExist
+func (mr *MockIDagMockRecorder) IsTransactionExist(hash interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasTransaction", reflect.TypeOf((*MockIDag)(nil).HasTransaction), hash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsTransactionExist", reflect.TypeOf((*MockIDag)(nil).IsTransactionExist), hash)
 }
 
 // GetTxSearchEntry mocks base method
@@ -1132,4 +1134,89 @@ func (m *MockIDag) ValidateUnitExceptGroupSig(unit *modules.Unit) error {
 func (mr *MockIDagMockRecorder) ValidateUnitExceptGroupSig(unit interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateUnitExceptGroupSig", reflect.TypeOf((*MockIDag)(nil).ValidateUnitExceptGroupSig), unit)
+}
+
+// RefreshSysParameters mocks base method
+func (m *MockIDag) RefreshSysParameters() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RefreshSysParameters")
+}
+
+// RefreshSysParameters indicates an expected call of RefreshSysParameters
+func (mr *MockIDagMockRecorder) RefreshSysParameters() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshSysParameters", reflect.TypeOf((*MockIDag)(nil).RefreshSysParameters))
+}
+
+// SaveChaincode mocks base method
+func (m *MockIDag) SaveChaincode(contractId common.Address, cc *list.CCInfo) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveChaincode", contractId, cc)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveChaincode indicates an expected call of SaveChaincode
+func (mr *MockIDagMockRecorder) SaveChaincode(contractId, cc interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveChaincode", reflect.TypeOf((*MockIDag)(nil).SaveChaincode), contractId, cc)
+}
+
+// GetChaincodes mocks base method
+func (m *MockIDag) GetChaincodes(contractId common.Address) (*list.CCInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetChaincodes", contractId)
+	ret0, _ := ret[0].(*list.CCInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetChaincodes indicates an expected call of GetChaincodes
+func (mr *MockIDagMockRecorder) GetChaincodes(contractId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChaincodes", reflect.TypeOf((*MockIDag)(nil).GetChaincodes), contractId)
+}
+
+// GetPartitionChains mocks base method
+func (m *MockIDag) GetPartitionChains() ([]*modules.PartitionChain, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPartitionChains")
+	ret0, _ := ret[0].([]*modules.PartitionChain)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPartitionChains indicates an expected call of GetPartitionChains
+func (mr *MockIDagMockRecorder) GetPartitionChains() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPartitionChains", reflect.TypeOf((*MockIDag)(nil).GetPartitionChains))
+}
+
+// GetMainChain mocks base method
+func (m *MockIDag) GetMainChain() (*modules.MainChain, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMainChain")
+	ret0, _ := ret[0].(*modules.MainChain)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMainChain indicates an expected call of GetMainChain
+func (mr *MockIDagMockRecorder) GetMainChain() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMainChain", reflect.TypeOf((*MockIDag)(nil).GetMainChain))
+}
+
+// GetCoinYearRate mocks base method
+func (m *MockIDag) GetCoinYearRate() float64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCoinYearRate")
+	ret0, _ := ret[0].(float64)
+	return ret0
+}
+
+// GetCoinYearRate indicates an expected call of GetCoinYearRate
+func (mr *MockIDagMockRecorder) GetCoinYearRate() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCoinYearRate", reflect.TypeOf((*MockIDag)(nil).GetCoinYearRate))
 }

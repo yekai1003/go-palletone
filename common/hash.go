@@ -24,8 +24,8 @@ import (
 	"math/rand"
 	"reflect"
 	// "strings"
-	"crypto/sha256"
-	// "github.com/palletone/go-palletone/common/crypto/sha3"
+	// "crypto/sha256"
+	// "golang.org/x/crypto/sha3"
 	"github.com/palletone/go-palletone/common/hexutil"
 
 	"strings"
@@ -179,17 +179,18 @@ func Decode(dst *Hash, src string) error {
 	}
 	return nil
 }
-func DoubleHashH(b []byte) Hash {
-	first := sha256.Sum256(b)
-	return Hash(sha256.Sum256(first[:]))
-}
 
-// DoubleHashB calculates hash(hash(b)) and returns the resulting bytes.
-func DoubleHashB(b []byte) []byte {
-	first := sha256.Sum256(b)
-	second := sha256.Sum256(first[:])
-	return second[:]
-}
+// func DoubleHashH(b []byte) Hash {
+// 	first := sha256.Sum256(b)
+// 	return Hash(sha256.Sum256(first[:]))
+// }
+
+// // DoubleHashB calculates hash(hash(b)) and returns the resulting bytes.
+// func DoubleHashB(b []byte) []byte {
+// 	first := sha256.Sum256(b)
+// 	second := sha256.Sum256(first[:])
+// 	return second[:]
+// }
 
 func CheckExists(search Hash, array []Hash) int {
 	for index, h := range array {

@@ -29,20 +29,27 @@ import (
 )
 
 type TxJson struct {
-	TxHash         string              `json:"tx_hash"`
-	TxSize         float64             `json:"tx_size"`
-	Payment        *PaymentJson        `json:"payment"`
-	Vote           *VoteJson           `json:"vote"`
-	Data           *DataJson           `json:"data"`
-	ContractTpl    *TplJson            `json:"contract_tpl"`
-	Deploy         *DeployJson         `json:"contract_deploy"`
-	Invoke         *InvokeJson         `json:"contract_invoke"`
-	Stop           *StopJson           `json:"contract_stop"`
-	Signature      *SignatureJson      `json:"signature"`
-	InstallRequest *InstallRequestJson `json:"install_request"`
-	DeployRequest  *DeployRequestJson  `json:"deploy_request"`
-	InvokeRequest  *InvokeRequestJson  `json:"invoke_request"`
-	StopRequest    *StopRequestJson    `json:"stop_request"`
+	TxHash             string              `json:"tx_hash"`
+	TxSize             float64             `json:"tx_size"`
+	Payment            *PaymentJson        `json:"payment"`
+	AccountStateUpdate *AccountStateJson   `json:"account_state_update"`
+	Data               *DataJson           `json:"data"`
+	ContractTpl        *TplJson            `json:"contract_tpl"`
+	Deploy             *DeployJson         `json:"contract_deploy"`
+	Invoke             *InvokeJson         `json:"contract_invoke"`
+	Stop               *StopJson           `json:"contract_stop"`
+	Signature          *SignatureJson      `json:"signature"`
+	InstallRequest     *InstallRequestJson `json:"install_request"`
+	DeployRequest      *DeployRequestJson  `json:"deploy_request"`
+	InvokeRequest      *InvokeRequestJson  `json:"invoke_request"`
+	StopRequest        *StopRequestJson    `json:"stop_request"`
+}
+type TxWithUnitInfoJson struct {
+	*TxJson
+	UnitHash   string    `json:"unit_hash"`
+	UnitHeight uint64    `json:"unit_height"`
+	Timestamp  time.Time `json:"timestamp"`
+	TxIndex    uint64    `json:"tx_index"`
 }
 type TplJson struct {
 	TemplateId string `json:"template_id"`
@@ -58,6 +65,7 @@ type DeployJson struct {
 	Name       string   `json:"name"`
 	Args       [][]byte `json:"args"` // contract arguments list
 	Jury       []string `json:"jury"`
+	EleList    string   `json:"election_list"`
 	ReadSet    string   `json:"read_set"`
 	WriteSet   string   `json:"write_set"`
 }
@@ -79,13 +87,9 @@ type SignatureJson struct {
 	Signatures []string `json:"signature_set"` // the array of signature
 }
 
-type VoteJson struct {
-	Content string `json:"vote_content"`
-}
-
 type InvokeRequestJson struct {
-	ContractAddr string `json:"contract_addr"`
-	FunctionName string `json:"function_name"`
+	ContractAddr string   `json:"contract_addr"`
+	FunctionName string   `json:"function_name"`
 	Args         []string `json"arg_set"`
 }
 
@@ -96,24 +100,39 @@ type InstallRequestJson struct {
 }
 
 type DeployRequestJson struct {
-	TplId   string `json:"tpl_id"`
-	TxId    string `json:"tx_id"`
-	Args    []string `json:"arg_set"`
+	TplId   string        `json:"tpl_id"`
+	TxId    string        `json:"tx_id"`
+	Args    []string      `json:"arg_set"`
 	Timeout time.Duration `json:"timeout"`
 }
 
 type StopRequestJson struct {
 	ContractId  string `json:"contract_id"`
 	Txid        string `json:"tx_id"`
-	DeleteImage bool `json:"delete_image"`
+	DeleteImage bool   `json:"delete_image"`
 }
 type DataJson struct {
 	MainData  string `json:"main_data"`
 	ExtraData string `json:"extra_data"`
 }
+type AccountStateJson struct {
+	WriteSet string `json:"write_set"`
+}
 
-func ConvertTx2Json(tx *modules.Transaction, utxoQuery modules.QueryUtxoFunc) TxJson {
-	txjson := TxJson{TxHash: tx.Hash().String(), TxSize: float64(tx.Size())}
+func ConvertTxWithUnitInfo2FullJson(tx *modules.TransactionWithUnitInfo, utxoQuery modules.QueryUtxoFunc) *TxWithUnitInfoJson {
+	txjson := &TxWithUnitInfoJson{
+		UnitHash:   tx.UnitHash.String(),
+		UnitHeight: tx.UnitIndex,
+		Timestamp:  time.Unix(int64(tx.Timestamp), 0),
+		TxIndex:    tx.TxIndex,
+	}
+	txjson.TxJson = ConvertTx2FullJson(tx.Transaction, utxoQuery)
+	return txjson
+}
+func ConvertTx2FullJson(tx *modules.Transaction, utxoQuery modules.QueryUtxoFunc) *TxJson {
+	txjson := &TxJson{}
+	txjson.TxHash = tx.Hash().String()
+	txjson.TxSize = float64(tx.Size())
 	for _, m := range tx.TxMessages {
 		if m.App == modules.APP_PAYMENT {
 			pay := m.Payload.(*modules.PaymentPayload)
@@ -154,6 +173,9 @@ func ConvertTx2Json(tx *modules.Transaction, utxoQuery modules.QueryUtxoFunc) Tx
 		} else if m.App == modules.APP_SIGNATURE {
 			sig := m.Payload.(*modules.SignaturePayload)
 			txjson.Signature = convertSig2Json(sig)
+		} else if m.App == modules.APP_ACCOUNT_UPDATE {
+			acc := m.Payload.(*modules.AccountStateUpdatePayload)
+			txjson.AccountStateUpdate = convertAccountState2Json(acc)
 		}
 	}
 	return txjson
@@ -184,9 +206,11 @@ func convertDeploy2Json(deploy *modules.ContractDeployPayload) *DeployJson {
 	hash.SetBytes(deploy.ContractId[:])
 	djson.ContractId = hash.String()
 	djson.Args = deploy.Args
-	for _, addr := range deploy.Jury {
-		djson.Jury = append(djson.Jury, addr.String())
-	}
+	//for _, addr := range deploy.Jury {
+	//	djson.Jury = append(djson.Jury, addr.String())
+	//}
+	ele, _ := json.Marshal(deploy.EleList)
+	djson.EleList = string(ele)
 	rset, _ := json.Marshal(deploy.ReadSet)
 	djson.ReadSet = string(rset)
 	wset, _ := json.Marshal(deploy.WriteSet)
@@ -211,9 +235,6 @@ func convertStop2Json(stop *modules.ContractStopPayload) *StopJson {
 	sjson := new(StopJson)
 	hash := common.BytesToHash(stop.ContractId[:])
 	sjson.ContractId = hash.String()
-	for _, addr := range stop.Jury {
-		sjson.Jury = append(sjson.Jury, addr.String())
-	}
 	rset, _ := json.Marshal(stop.ReadSet)
 	sjson.ReadSet = string(rset)
 	wset, _ := json.Marshal(stop.WriteSet)
@@ -267,4 +288,10 @@ func convertStopRequest2Json(req *modules.ContractStopRequestPayload) *StopReque
 	reqJson.Txid = req.Txid
 
 	return reqJson
+}
+func convertAccountState2Json(accountState *modules.AccountStateUpdatePayload) *AccountStateJson {
+	jsonAcc := &AccountStateJson{}
+	writeSet, _ := json.Marshal(accountState.WriteSet)
+	jsonAcc.WriteSet = string(writeSet)
+	return jsonAcc
 }

@@ -22,6 +22,9 @@ package validator
 
 import (
 	"encoding/hex"
+	"testing"
+	"time"
+
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/core"
@@ -29,8 +32,6 @@ import (
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/tokenengine"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func TestValidate_ValidateUnitTxs(t *testing.T) {
@@ -46,7 +47,7 @@ func TestValidate_ValidateUnitTxs(t *testing.T) {
 
 	utxoQuery := &mockUtxoQuery{}
 	validate := NewValidate(nil, utxoQuery, nil)
-	code := validate.validateTransactions(txs)
+	code := validate.validateTransactions(txs, time.Now().Unix())
 	assert.Equal(t, code, TxValidationCode_VALID)
 }
 
@@ -187,7 +188,7 @@ func newHeader(txs modules.Transactions) *modules.Header {
 	sign, _ := crypto.Sign(headerHash[:], privKey)
 	header.Authors = modules.Authentifier{PubKey: pubKey, Signature: sign}
 	header.Time = time.Now().Unix()
-	header.Number = &modules.ChainIndex{modules.NewPTNIdType(), true, 1}
+	header.Number = &modules.ChainIndex{modules.NewPTNIdType(), 1}
 	return header
 }
 func TestValidate_ValidateHeader(t *testing.T) {

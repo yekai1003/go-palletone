@@ -21,13 +21,11 @@
 package dag
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/core/accounts/keystore"
-	// "github.com/palletone/go-palletone/core/types"
 	dagcommon "github.com/palletone/go-palletone/dag/common"
 	"github.com/palletone/go-palletone/dag/dagconfig"
 	"github.com/palletone/go-palletone/dag/modules"
@@ -51,12 +49,14 @@ func (dag *Dag) GenerateUnit(when time.Time, producer common.Address, groupPubKe
 	// todo 应当在其他地方其他时刻更新该值
 	hash, chainIndex, _ := dag.propRep.GetNewestUnit(gasToken)
 	if !dag.IsHeaderExist(hash) {
-		log.Debugf("Newest unit[%s] not exist in dag, retrieve another from memdag and update NewestUnit.index [%d]", hash.String(), chainIndex.Index)
+		log.Debugf("Newest unit[%s] not exist in dag, retrieve another from memdag "+
+			"and update NewestUnit.index [%d]", hash.String(), chainIndex.Index)
 		newestUnit := dag.Memdag.GetLastMainchainUnit(gasToken)
 		if nil != newestUnit {
 			dag.propRep.SetNewestUnit(newestUnit.Header())
 		}
 	}
+
 	// 2. 生产unit，添加交易集、时间戳、签名
 	newUnit, err := dag.CreateUnit(&producer, txpool, when)
 	if err != nil {
@@ -77,26 +77,28 @@ func (dag *Dag) GenerateUnit(when time.Time, producer common.Address, groupPubKe
 
 	sign_unit, err1 := dagcommon.GetUnitWithSig(newUnit, ks, producer)
 	if err1 != nil {
-		log.Debug(fmt.Sprintf("GetUnitWithSig error: %v", err))
+		log.Debugf("GetUnitWithSig error: %v", err)
 		return nil
 	}
 
 	sign_unit.UnitSize = sign_unit.Size()
-	log.Debugf("Generate new unit index:[%d],hash:[%s],size:%s, parent unit[%s], spent time: %s", sign_unit.NumberU64(), sign_unit.UnitHash.String(), sign_unit.UnitSize.String(), newUnit.UnitHeader.ParentsHash[0].String(), time.Since(t0).String())
+	log.Debugf("Generate new unit index:[%d],hash:[%s],size:%s, parent unit[%s], spent time: %s",
+		sign_unit.NumberU64(), sign_unit.Hash().String(), sign_unit.UnitSize.String(),
+		newUnit.UnitHeader.ParentsHash[0].String(), time.Since(t0).String())
 
 	//TODO add PostChainEvents
-	// go func() {
-	// 	var (
-	// 		events        = make([]interface{}, 0, 1)
-	// 		coalescedLogs []*types.Log
-	// 	)
-	// 	events = append(events, modules.ChainEvent{newUnit, common.Hash{}, nil})
-	// 	dag.PostChainEvents(events, coalescedLogs)
-	// }()
+	go func() {
+		var (
+			events = make([]interface{}, 0, 1)
+		)
+		events = append(events, modules.ChainHeadEvent{newUnit})
+		dag.PostChainEvents(events)
+	}()
 
 	if !dag.PushUnit(sign_unit, txpool) {
 		return nil
 	}
+
 	return sign_unit
 }
 
@@ -113,7 +115,7 @@ func (dag *Dag) PushUnit(newUnit *modules.Unit, txpool txspool.ITxPool) bool {
 	// 1. 如果当前初生产的unit不在最长链条上，那么就切换到最长链分叉上。
 
 	// 2. 更新状态
-	if !dag.ApplyUnit(newUnit) {
+	if err := dag.ApplyUnit(newUnit); err != nil {
 		return false
 	}
 
@@ -123,7 +125,7 @@ func (dag *Dag) PushUnit(newUnit *modules.Unit, txpool txspool.ITxPool) bool {
 }
 
 // ApplyUnit, 运用下一个 unit 更新整个区块链状态
-func (dag *Dag) ApplyUnit(nextUnit *modules.Unit) bool {
+func (dag *Dag) ApplyUnit(nextUnit *modules.Unit) error {
 	defer func(start time.Time) {
 		log.Debugf("ApplyUnit cost time: %v", time.Since(start))
 	}(time.Now())
@@ -132,13 +134,13 @@ func (dag *Dag) ApplyUnit(nextUnit *modules.Unit) bool {
 	defer dag.applyLock.Unlock()
 
 	// 1. 下一个 unit 和本地 unit 连续性的判断
-	if !dag.validateUnitHeader(nextUnit) {
-		return false
+	if err := dag.validateUnitHeader(nextUnit); err != nil {
+		return err
 	}
 
 	// 2. 验证 unit 的 mediator 调度
-	if !dag.validateMediatorSchedule(nextUnit) {
-		return false
+	if err := dag.validateMediatorSchedule(nextUnit); err != nil {
+		return err
 	}
 
 	// todo 5. 运用Unit中的交易
@@ -162,5 +164,5 @@ func (dag *Dag) ApplyUnit(nextUnit *modules.Unit) bool {
 	// 8. 洗牌
 	dag.updateMediatorSchedule()
 
-	return true
+	return nil
 }

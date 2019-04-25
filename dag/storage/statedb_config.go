@@ -23,18 +23,28 @@
 package storage
 
 import (
+	"encoding/json"
 	"github.com/palletone/go-palletone/contracts/syscontract"
 	"github.com/palletone/go-palletone/dag/dagconfig"
 	"github.com/palletone/go-palletone/dag/modules"
 )
 
 //var CONF_PREFIX = append(constants.CONTRACT_STATE_PREFIX, scc.SysConfigContractAddress.Bytes()...)
+func (statedb *StateDb) SaveSysConfig(key string, val []byte, ver *modules.StateVersion) error {
+	//SaveContractState(id []byte, name string, value interface{}, version *modules.StateVersion)
+	id := syscontract.SysConfigContractAddress.Bytes21()
+	err := saveContractState(statedb.db, id, key, val, ver)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 /**
 获取配置信息
 get config information
 */
-func (statedb *StateDb) GetConfig(name string) ([]byte, *modules.StateVersion, error) {
+func (statedb *StateDb) GetSysConfig(name string) ([]byte, *modules.StateVersion, error) {
 	id := syscontract.SysConfigContractAddress.Bytes21()
 	return statedb.GetContractState(id, name)
 }
@@ -50,4 +60,28 @@ func (statedb *StateDb) GetConfig(name string) ([]byte, *modules.StateVersion, e
 func (statedb *StateDb) GetMinFee() (*modules.AmountAsset, error) {
 	assetId := dagconfig.DagConfig.GetGasToken()
 	return &modules.AmountAsset{Amount: 0, Asset: assetId.ToAsset()}, nil
+}
+func (statedb *StateDb) GetPartitionChains() ([]*modules.PartitionChain, error) {
+	id := syscontract.PartitionContractAddress.Bytes21()
+	rows, err := statedb.GetContractStatesByPrefix(id, "PC")
+	if err != nil {
+		return nil, err
+	}
+	result := []*modules.PartitionChain{}
+	for _, v := range rows {
+		partition := &modules.PartitionChain{}
+		json.Unmarshal(v.Value, &partition)
+		result = append(result, partition)
+	}
+	return result, nil
+}
+func (statedb *StateDb) GetMainChain() (*modules.MainChain, error) {
+	id := syscontract.PartitionContractAddress.Bytes21()
+	data, _, err := statedb.GetContractState(id, "MainChain")
+	if err != nil {
+		return nil, err
+	}
+	mainChain := &modules.MainChain{}
+	json.Unmarshal(data, &mainChain)
+	return mainChain, nil
 }

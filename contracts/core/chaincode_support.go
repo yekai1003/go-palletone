@@ -414,6 +414,7 @@ func (chaincodeSupport *ChaincodeSupport) getLaunchConfigs(cccid *ccprovider.CCC
 		envs = append(envs, "CORE_CHAINCODE_LOGGING_SHIM="+chaincodeSupport.shimLogLevel)
 	}
 	if chaincodeSupport.peerAddress != "" {
+		log.Infof("-------------------------------------------%s\n\n",chaincodeSupport.peerAddress)
 		envs = append(envs, "CORE_CHAINCODE_PEER_ADDRESS="+chaincodeSupport.peerAddress)
 	}
 	if chaincodeSupport.logFormat != "" {
@@ -593,6 +594,8 @@ func (chaincodeSupport *ChaincodeSupport) launchAndWaitForRegister(ctxt context.
 		if errIgnore != nil {
 			log.Debugf("stop failed: %+v", errIgnore)
 		}
+		//TODO
+		return chaincodeSupport.launchAndWaitForRegister(ctxt, cccid, cds , launcher )
 	}
 	return err
 }
@@ -879,7 +882,6 @@ func (chaincodeSupport *ChaincodeSupport) Execute(ctxt context.Context, cccid *c
 
 	//our responsibility to delete transaction context if sendExecuteMessage succeeded
 	chrte.handler.deleteTxContext(msg.ChannelId, msg.Txid)
-
 	return ccresp, err
 }
 

@@ -22,6 +22,7 @@ package dag
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,12 +33,14 @@ import (
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/ptndb"
 	"github.com/palletone/go-palletone/configure"
+	"github.com/palletone/go-palletone/contracts/list"
 	"github.com/palletone/go-palletone/core/types"
 	dagcommon "github.com/palletone/go-palletone/dag/common"
 	"github.com/palletone/go-palletone/dag/dagconfig"
 	"github.com/palletone/go-palletone/dag/errors"
 	"github.com/palletone/go-palletone/dag/memunit"
 	"github.com/palletone/go-palletone/dag/modules"
+	"github.com/palletone/go-palletone/dag/parameter"
 	"github.com/palletone/go-palletone/dag/storage"
 	"github.com/palletone/go-palletone/dag/txspool"
 	"github.com/palletone/go-palletone/tokenengine"
@@ -130,12 +133,8 @@ func (d *Dag) HasUnit(hash common.Hash) bool {
 	}
 	return u != nil
 }
-func (d *Dag) HasTransaction(hash common.Hash) bool {
-	b, err := d.unstableUnitRep.IsTransactionExist(hash)
-	if err != nil {
-		return false
-	}
-	return b
+func (d *Dag) IsTransactionExist(hash common.Hash) (bool, error) {
+	return d.unstableUnitRep.IsTransactionExist(hash)
 }
 
 // confirm unit
@@ -282,16 +281,25 @@ func (d *Dag) InsertDag(units modules.Units, txpool txspool.ITxPool) (int, error
 				units[i].UnitHeader.Number.Index, units[i].UnitHash)
 		}
 
+		timestamp := time.Unix(u.Timestamp(), 0)
+		log.Infof("InsertDag unit(%v) #%v parent(%v) @%v signed by %v", u.UnitHash.TerminalString(),
+			u.NumberU64(), u.ParentHash()[0].TerminalString(), timestamp.Format("2006-01-02 15:04:05"),
+			u.Author().Str())
+
 		// append by albert·gou, 利用 unit 更新相关状态
-		d.ApplyUnit(u)
+		if err := d.ApplyUnit(u); err != nil {
+			//return count, err
+			return count, nil
+		}
 
 		// todo 应当和本地生产的unit统一接口，而不是直接存储
 		//if err := d.unstableUnitRep.SaveUnit(u, false); err != nil {
 		if err := d.SaveUnit(u, txpool, false); err != nil {
 			return count, err
 		}
+
 		//d.updateLastIrreversibleUnitNum(u.Hash(), uint64(u.NumberU64()))
-		log.Debug("Dag", "InsertDag ok index:", u.UnitHeader.Number.Index, "hash:", u.Hash())
+		//log.Debug("Dag", "InsertDag ok index:", u.UnitHeader.Number.Index, "hash:", u.Hash())
 		count += 1
 		// events = append(events, modules.ChainEvent{u, common.Hash{}, nil})
 	}
@@ -568,6 +576,14 @@ func NewDagForTest(db ptndb.Database, txpool txspool.ITxPool) (*Dag, error) {
 	return dag, nil
 }
 
+func (d *Dag) GetChaincodes(contractId common.Address) (*list.CCInfo, error) {
+	return d.propRep.GetChaincodes(contractId)
+}
+
+func (d *Dag) SaveChaincode(contractId common.Address, cc *list.CCInfo) error {
+	return d.propRep.SaveChaincode(contractId, cc)
+}
+
 // Get Contract Api
 func (d *Dag) GetContract(id []byte) (*modules.Contract, error) {
 	return d.unstableStateRep.GetContract(id)
@@ -735,6 +751,24 @@ func (d *Dag) GetAddrUtxos(addr common.Address) (map[modules.OutPoint]*modules.U
 	all, err := d.unstableUtxoRep.GetAddrUtxos(addr, nil)
 
 	return all, err
+}
+
+//TODO Devin 换届后请调用该函数
+func (d *Dag) RefreshSysParameters() {
+	deposit, _, _ := d.unstableStateRep.GetConfig("DepositRate")
+	depositYearRate, _ := strconv.ParseFloat(string(deposit), 64)
+	parameter.CurrentSysParameters.DepositContractInterest = depositYearRate / 365
+	log.Debugf("Load SysParameter DepositContractInterest value:%f", parameter.CurrentSysParameters.DepositContractInterest)
+	txCoinYearRateStr, _, _ := d.unstableStateRep.GetConfig("TxCoinYearRate")
+	txCoinYearRate, _ := strconv.ParseFloat(string(txCoinYearRateStr), 64)
+	parameter.CurrentSysParameters.TxCoinDayInterest = txCoinYearRate / 365
+	log.Debugf("Load SysParameter TxCoinDayInterest value:%f", parameter.CurrentSysParameters.TxCoinDayInterest)
+
+	generateUnitRewardStr, _, _ := d.unstableStateRep.GetConfig("GenerateUnitReward")
+	generateUnitReward, _ := strconv.ParseUint(string(generateUnitRewardStr), 10, 64)
+	parameter.CurrentSysParameters.GenerateUnitReward = generateUnitReward
+	log.Debugf("Load SysParameter GenerateUnitReward value:%d", parameter.CurrentSysParameters.GenerateUnitReward)
+
 }
 
 //func (d *Dag) SaveUtxoView(view *txspool.UtxoViewpoint) error {
@@ -946,7 +980,7 @@ func (d *Dag) CreateUnitForTest(txs modules.Transactions) (*modules.Unit, error)
 	// compute height
 	height := &modules.ChainIndex{
 		AssetID: currentUnit.UnitHeader.Number.AssetID,
-		IsMain:  currentUnit.UnitHeader.Number.IsMain,
+		//IsMain:  currentUnit.UnitHeader.Number.IsMain,
 		Index:   currentUnit.UnitHeader.Number.Index + 1,
 	}
 	//
@@ -1138,6 +1172,10 @@ func (d *Dag) GetLightHeaderByHash(headerHash common.Hash) (*modules.Header, err
 	return nil, nil
 }
 func (d *Dag) GetLightChainHeight(assetId modules.AssetId) uint64 {
+	header := d.CurrentHeader(assetId)
+	if header != nil {
+		return header.Number.Index
+	}
 	return uint64(0)
 }
 func (d *Dag) InsertLightHeader(headers []*modules.Header) (int, error) {
@@ -1190,26 +1228,42 @@ func (bc *Dag) SubscribeChainEvent(ch chan<- modules.ChainEvent) event.Subscript
 // PostChainEvents iterates over the events generated by a chain insertion and
 // posts them into the event feed.
 // TODO: Should not expose PostChainEvents. The chain events should be posted in WriteBlock.
-// func (bc *Dag) PostChainEvents(events []interface{}, logs []*types.Log) {
-// 	log.Debug("enter PostChainEvents")
-// 	// post event logs for further processing
-// 	if logs != nil {
-// 		bc.logsFeed.Send(logs)
-// 	}
-// 	for _, event := range events {
-// 		switch ev := event.(type) {
-// 		case modules.ChainEvent:
-// 			log.Debug("======PostChainEvents======", "ev", ev)
-// 			bc.chainFeed.Send(ev)
+func (bc *Dag) PostChainEvents(events []interface{}) {
+	log.Debug("enter PostChainEvents")
+	// post event logs for further processing
+	//if logs != nil {
+	//	bc.logsFeed.Send(logs)
+	//}
+	for _, event := range events {
+		switch ev := event.(type) {
+		case modules.ChainEvent:
+			log.Debug("======PostChainEvents======", "ev", ev)
+			bc.chainFeed.Send(ev)
 
-// 		case modules.ChainHeadEvent:
-// 			bc.chainHeadFeed.Send(ev)
+		case modules.ChainHeadEvent:
+			log.Debug("======PostChainHeadEvent======", "ev", ev)
+			bc.chainHeadFeed.Send(ev)
 
-// 			//case modules.ChainSideEvent:
-// 			//	bc.chainSideFeed.Send(ev)
-// 		}
-// 	}
-// }
+			//case modules.ChainSideEvent:
+			//	bc.chainSideFeed.Send(ev)
+		}
+	}
+}
+func (bc *Dag) GetPartitionChains() ([]*modules.PartitionChain, error) {
+	return bc.unstableStateRep.GetPartitionChains()
+}
+func (bc *Dag) GetMainChain() (*modules.MainChain, error) {
+	return bc.unstableStateRep.GetMainChain()
+}
+func (d *Dag) GetCoinYearRate() float64 {
+	data, _, err := d.GetConfig("TxCoinYearRate")
+	if err != nil {
+		log.Warn("Cannot read system config by key :TxCoinYearRate")
+		return 0
+	}
+	rate, _ := strconv.ParseFloat(string(data), 64)
+	return rate
+}
 
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.
 //func (bc *Dag) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Subscription {

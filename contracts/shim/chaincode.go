@@ -115,7 +115,8 @@ func userChaincodeStreamGetter(name string) (PeerChaincodeStream, error) {
 		cert = string(data)
 	}
 	flag.Parse()
-	log.Debugf("Peer address: %s", getPeerAddress())
+	//TODO peer
+	log.Debugf("Peer address: %s", viper.GetString("chaincode.peer.address"))
 	// Establish connection with validating peer
 	clientConn, err := newPeerClientConnection()
 	if err != nil {
@@ -253,6 +254,8 @@ func newPeerClientConnection() (*grpc.ClientConn, error) {
 		return comm.NewClientConnectionWithAddress(peerAddress, true, true,
 			comm.InitTLSForShim(key, cert), kaOpts)
 	}
+	//TODO peer
+	log.Debugf("PeerClient: %s", getPeerAddress())
 	return comm.NewClientConnectionWithAddress(peerAddress, true, false, nil, kaOpts)
 }
 
@@ -571,19 +574,32 @@ func (stub *ChaincodeStub) GetInvokeFees() (*modules.AmountAsset, error) {
 	_, _, invokeFees, _, _, err := stub.GetInvokeParameters()
 	return invokeFees, err
 }
+func (stub *ChaincodeStub) GetContractID() ([]byte, string) {
+	addr := new(common.Address)
+	addr.SetBytes(stub.ContractId)
+	return stub.ContractId, addr.Str()
+}
 
 //获得该合约的Token余额
 func (stub *ChaincodeStub) GetTokenBalance(address string, token *modules.Asset) ([]*modules.InvokeTokens, error) {
 	return stub.handler.handleGetTokenBalance(address, token, stub.ContractId, stub.ChannelId, stub.TxID)
 }
 
+var ERROR_ONLY_SYS_CONTRACT = errors.New("Only system contract can call this function.")
+
 func (stub *ChaincodeStub) DefineToken(tokenType byte, define []byte, creator string) error {
+	if !common.IsSystemContractAddress(stub.ContractId) {
+		return ERROR_ONLY_SYS_CONTRACT
+	}
 	return stub.handler.handleDefineToken(tokenType, define, creator, stub.ContractId, stub.ChannelId, stub.TxID)
 }
 
 //增发一种之前已经定义好的Token
 //如果是ERC20增发，则uniqueId为空，如果是ERC721增发，则必须指定唯一的uniqueId
 func (stub *ChaincodeStub) SupplyToken(assetId []byte, uniqueId []byte, amt uint64, creator string) error {
+	if !common.IsSystemContractAddress(stub.ContractId) {
+		return ERROR_ONLY_SYS_CONTRACT
+	}
 	return stub.handler.handleSupplyToken(assetId, uniqueId, amt, creator, stub.ContractId, stub.ChannelId, stub.TxID)
 }
 
@@ -598,10 +614,36 @@ func (stub *ChaincodeStub) GetRequesterCert() (certBytes []byte, err error) {
 	if len(stub.args) <= 1 {
 		return nil, fmt.Errorf("args error: has no cert info")
 	}
-	certID := big.Int{}
-	certID.SetBytes(stub.args[1])
-	key := dagConstants.CERT_BYTES_SYMBOL + certID.String()
-	return stub.handler.handleGetCertByID(key, stub.ChannelId, stub.TxID)
+	// query cert bytes
+	intCertID := new(big.Int).SetBytes(stub.args[1])
+	if intCertID == nil {
+		return nil, fmt.Errorf("certid bytes error")
+	}
+	key := dagConstants.CERT_BYTES_SYMBOL + intCertID.String()
+	resBytes, err := stub.handler.handleGetCertState(key, stub.ChannelId, stub.TxID)
+	if err != nil {
+		return nil, err
+	}
+	if len(resBytes) <= 0 {
+		return nil, fmt.Errorf("query no cert bytes")
+	}
+	certDBInfo := modules.CertBytesInfo{}
+	if err := json.Unmarshal(resBytes, &certDBInfo); err != nil {
+		return nil, err
+	}
+	return certDBInfo.Raw, nil
+}
+
+func (stub *ChaincodeStub) IsRequesterCertValid() (bool, error) {
+	if len(stub.args) <= 1 {
+		return false, fmt.Errorf("args error: has no cert info")
+	}
+	caller, err := stub.GetInvokeAddress()
+	if err != nil {
+		return false, err
+	}
+
+	return stub.handler.handlerCheckCertValidation(caller.String(), stub.args[1], stub.ChannelId, stub.TxID)
 }
 
 // ------------- Logging Control and Chaincode Loggers ---------------

@@ -103,14 +103,14 @@ web3._extend({
 		new web3._extend.Method({
 			name: 'ccinvoketx',
         	call: 'ptn_ccinvoketx',
-        	params: 6, //from, to, daoAmount, daoFee , contractAddr, args[]string------>["fun", "key", "value"]
-			inputFormatter: [null, null, null,null, null, null]
+        	params: 7, //from, to, daoAmount, daoFee , contractAddr, args[]string------>["fun", "key", "value"], certid
+			inputFormatter: [null, null, null,null, null, null, null]
 		}),
         new web3._extend.Method({
 			name: 'ccinvoketxPass',
 			call: 'ptn_ccinvoketxPass',
-			params: 8, //from, to, daoAmount, daoFee , contractAddr, args[]string------>["fun", "key", "value"],passwd,duration
-			inputFormatter: [null, null, null,null, null, null, null, null]
+			params: 9, //from, to, daoAmount, daoFee , contractAddr, args[]string------>["fun", "key", "value"],passwd,duration, certid
+			inputFormatter: [null, null, null,null, null, null, null, null, null]
 		}),
 		new web3._extend.Method({
 			name: 'ccinvokeToken',
@@ -142,8 +142,6 @@ web3._extend({
         	params: 0, //
 			inputFormatter: []
 		}),
-
-
 		new web3._extend.Method({
 			name: 'depositContractInvoke',
         	call: 'ptn_depositContractInvoke',
@@ -208,6 +206,16 @@ web3._extend({
 			name: 'election',
 			call: 'ptn_election',
 			params: 1,			
+		}),
+		new web3._extend.Method({
+			name: 'proofTransaction',
+			call: 'ptn_proofTransaction',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'validationPath',
+			call: 'ptn_validationPath',
+			params: 1
 		}),
 	],
 

@@ -21,7 +21,6 @@ package txspool
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -91,7 +90,7 @@ type dags interface {
 	GetTxFromAddress(tx *modules.Transaction) ([]common.Address, error)
 	// GetTransaction(hash common.Hash) (*modules.Transaction, common.Hash, uint64, uint64, error)
 	GetTransactionOnly(hash common.Hash) (*modules.Transaction, error)
-	HasTransaction(hash common.Hash) bool
+	IsTransactionExist(hash common.Hash) (bool, error)
 	GetHeaderByHash(common.Hash) (*modules.Header, error)
 	GetUtxoEntry(outpoint *modules.OutPoint) (*modules.Utxo, error)
 	//GetUtxoView(tx *modules.Transaction) (*UtxoViewpoint, error)
@@ -162,14 +161,14 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 }
 
 type TxPool struct {
-	config       TxPoolConfig
-	unit         dags
-	txFeed       event.Feed
-	scope        event.SubscriptionScope
-	chainHeadCh  chan modules.ChainHeadEvent
-	chainHeadSub event.Subscription
-	txValidator  validator.Validator
-	journal      *txJournal // Journal of local transaction to back up to disk
+	config TxPoolConfig
+	unit   dags
+	txFeed event.Feed
+	scope  event.SubscriptionScope
+	//chainHeadCh  chan modules.ChainHeadEvent
+	//chainHeadSub event.Subscription
+	txValidator validator.Validator
+	journal     *txJournal // Journal of local transaction to back up to disk
 
 	all             sync.Map          // All transactions to allow lookups
 	priority_sorted *txPrioritiedList // All transactions sorted by price and priority
@@ -213,10 +212,10 @@ func NewTxPool(config TxPoolConfig, unit dags) *TxPool { // chainconfig *params.
 	config = (&config).sanitize()
 	// Create the transaction pool with its initial settings
 	pool := &TxPool{
-		config:         config,
-		unit:           unit,
-		all:            sync.Map{},
-		chainHeadCh:    make(chan modules.ChainHeadEvent, chainHeadChanSize),
+		config: config,
+		unit:   unit,
+		all:    sync.Map{},
+		//chainHeadCh:    make(chan modules.ChainHeadEvent, chainHeadChanSize),
 		outpoints:      sync.Map{},
 		nextExpireScan: time.Now().Add(config.OrphanTTL),
 		orphans:        sync.Map{},
@@ -238,7 +237,7 @@ func NewTxPool(config TxPoolConfig, unit dags) *TxPool { // chainconfig *params.
 		}
 	}
 	// Subscribe events from blockchain
-	pool.chainHeadSub = pool.unit.SubscribeChainHeadEvent(pool.chainHeadCh)
+	// pool.chainHeadSub = pool.unit.SubscribeChainHeadEvent(pool.chainHeadCh)
 	// Start the event loop and return
 	pool.wg.Add(1)
 	go pool.loop()
@@ -251,7 +250,7 @@ func (pool *TxPool) GetUtxoEntry(outpoint *modules.OutPoint) (*modules.Utxo, err
 		log.Debugf("Get UTXO from txpool by Outpoint:%s", outpoint.String())
 		return utxo, nil
 	}
-	log.Debugf("Outpoint[%s] and Utxo not in pool. query from db", outpoint.String())
+	//log.Debugf("Outpoint[%s] and Utxo not in pool. query from db", outpoint.String())
 	return pool.unit.GetUtxoEntry(outpoint)
 }
 
@@ -281,25 +280,25 @@ func (pool *TxPool) loop() {
 
 	// Track the previous head headers for transaction reorgs
 	// TODO 分区后 按token类型 loop 交易池。
-	gasToken := dagconfig.DagConfig.GetGasToken()
-	head := pool.unit.CurrentUnit(gasToken)
+	//gasToken := dagconfig.DagConfig.GetGasToken()
+	//head := pool.unit.CurrentUnit(gasToken)
 	// Keep waiting for and reacting to the various events
 	for {
 		select {
 		// Handle ChainHeadEvent
-		case ev := <-pool.chainHeadCh:
-			if ev.Unit != nil {
-				pool.mu.Lock()
-				pool.reset(head.Header(), ev.Unit.Header())
-				head = ev.Unit
-				pool.mu.Unlock()
-			}
-			// Be unsubscribed due to system stopped
-			//would recover
-		case <-pool.chainHeadSub.Err():
-			return
+		//case ev := <-pool.chainHeadCh:
+		//	if ev.Unit != nil {
+		//		pool.mu.Lock()
+		//		pool.reset(head.Header(), ev.Unit.Header())
+		//		head = ev.Unit
+		//		pool.mu.Unlock()
+		//	}
+		// Be unsubscribed due to system stopped
+		//would recover
+		//case <-pool.chainHeadSub.Err():
+		//	return
 
-			// Handle stats reporting ticks
+		// Handle stats reporting ticks
 		case <-report.C:
 			pending, queued, _ := pool.stats()
 
@@ -337,79 +336,80 @@ func (pool *TxPool) loop() {
 	}
 }
 
-// reset retrieves the current state of the blockchain and ensures the content
-// of the transaction pool is valid with regard to the chain state.
-func (pool *TxPool) reset(oldHead, newHead *modules.Header) {
-	token := newHead.Number.AssetID
-	// If we're reorging an old state, reinject all dropped transactions
-	var reinject modules.Transactions
-
-	if oldHead != nil && !modules.HeaderEqual(oldHead, newHead) {
-		// If the reorg is too deep, avoid doing it (will happen during fast sync)
-		oldNum := oldHead.Index()
-		newNum := newHead.Index()
-
-		if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
-			log.Debug("Skipping deep transaction reorg", "depth", depth)
-		} else {
-			// Reorg seems shallow enough to pull in all transactions into memory
-			var discarded, included modules.Transactions
-			var (
-				rem, _ = pool.unit.GetUnitByHash(oldHead.Hash())
-				add, _ = pool.unit.GetUnitByHash(newHead.Hash())
-			)
-			for rem.NumberU64() > add.NumberU64() {
-				discarded = append(discarded, rem.Transactions()...)
-				if rem, _ = pool.unit.GetUnitByHash(rem.ParentHash()[0]); rem == nil {
-					log.Error("Unrooted old unit seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
-					return
-				}
-			}
-			for add.NumberU64() > rem.NumberU64() {
-				included = append(included, add.Transactions()...)
-				if add, _ = pool.unit.GetUnitByHash(add.ParentHash()[0]); add == nil {
-					log.Error("Unrooted new unit seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
-					return
-				}
-			}
-			for rem.Hash() != add.Hash() {
-				discarded = append(discarded, rem.Transactions()...)
-				if rem, _ = pool.unit.GetUnitByHash(rem.ParentHash()[0]); rem == nil {
-					log.Error("Unrooted old unit seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
-					return
-				}
-				included = append(included, add.Transactions()...)
-				if add, _ = pool.unit.GetUnitByHash(add.ParentHash()[0]); add == nil {
-					log.Error("Unrooted new unit seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
-					return
-				}
-			}
-			reinject = modules.TxDifference(discarded, included)
-		}
-	}
-	// Initialize the internal state to the current head
-	if newHead == nil {
-		newHead = pool.unit.CurrentUnit(token).Header() // Special case during testing
-	}
-
-	// Inject any transactions discarded due to reorgs
-	log.Debug("Reinjecting stale transactions", "count", len(reinject))
-	pooltxs := make([]*modules.TxPoolTransaction, 0)
-	for _, tx := range reinject {
-		pooltxs = append(pooltxs, TxtoTxpoolTx(pool, tx))
-	}
-	if len(pooltxs) > 0 {
-		pool.addTxsLocked(pooltxs, false)
-	}
-	// validate the pool of pending transactions, this will remove
-	// any transactions that have been included in the block or
-	// have been invalidated because of another transaction (e.g.
-	// higher gas price)
-	pool.demoteUnexecutables()
-	// Check the queue and move transactions over to the pending if possible
-	// or remove those that have become invalid
-	pool.promoteExecutables()
-}
+//
+//// reset retrieves the current state of the blockchain and ensures the content
+//// of the transaction pool is valid with regard to the chain state.
+//func (pool *TxPool) reset(oldHead, newHead *modules.Header) {
+//	token := newHead.Number.AssetID
+//	// If we're reorging an old state, reinject all dropped transactions
+//	var reinject modules.Transactions
+//
+//	if oldHead != nil && !modules.HeaderEqual(oldHead, newHead) {
+//		// If the reorg is too deep, avoid doing it (will happen during fast sync)
+//		oldNum := oldHead.Index()
+//		newNum := newHead.Index()
+//
+//		if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
+//			log.Debug("Skipping deep transaction reorg", "depth", depth)
+//		} else {
+//			// Reorg seems shallow enough to pull in all transactions into memory
+//			var discarded, included modules.Transactions
+//			var (
+//				rem, _ = pool.unit.GetUnitByHash(oldHead.Hash())
+//				add, _ = pool.unit.GetUnitByHash(newHead.Hash())
+//			)
+//			for rem.NumberU64() > add.NumberU64() {
+//				discarded = append(discarded, rem.Transactions()...)
+//				if rem, _ = pool.unit.GetUnitByHash(rem.ParentHash()[0]); rem == nil {
+//					log.Error("Unrooted old unit seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
+//					return
+//				}
+//			}
+//			for add.NumberU64() > rem.NumberU64() {
+//				included = append(included, add.Transactions()...)
+//				if add, _ = pool.unit.GetUnitByHash(add.ParentHash()[0]); add == nil {
+//					log.Error("Unrooted new unit seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
+//					return
+//				}
+//			}
+//			for rem.Hash() != add.Hash() {
+//				discarded = append(discarded, rem.Transactions()...)
+//				if rem, _ = pool.unit.GetUnitByHash(rem.ParentHash()[0]); rem == nil {
+//					log.Error("Unrooted old unit seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
+//					return
+//				}
+//				included = append(included, add.Transactions()...)
+//				if add, _ = pool.unit.GetUnitByHash(add.ParentHash()[0]); add == nil {
+//					log.Error("Unrooted new unit seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
+//					return
+//				}
+//			}
+//			reinject = modules.TxDifference(discarded, included)
+//		}
+//	}
+//	// Initialize the internal state to the current head
+//	if newHead == nil {
+//		newHead = pool.unit.CurrentUnit(token).Header() // Special case during testing
+//	}
+//
+//	// Inject any transactions discarded due to reorgs
+//	log.Debug("Reinjecting stale transactions", "count", len(reinject))
+//	pooltxs := make([]*modules.TxPoolTransaction, 0)
+//	for _, tx := range reinject {
+//		pooltxs = append(pooltxs, TxtoTxpoolTx(pool, tx))
+//	}
+//	if len(pooltxs) > 0 {
+//		pool.addTxsLocked(pooltxs, false)
+//	}
+//	// validate the pool of pending transactions, this will remove
+//	// any transactions that have been included in the block or
+//	// have been invalidated because of another transaction (e.g.
+//	// higher gas price)
+//	pool.demoteUnexecutables()
+//	// Check the queue and move transactions over to the pending if possible
+//	// or remove those that have become invalid
+//	pool.promoteExecutables()
+//}
 
 // Stats retrieves the current pool stats, namely the number of pending and the
 // number of queued (non-executable) transactions.
@@ -604,11 +604,11 @@ func TxtoTxpoolTx(txpool ITxPool, tx *modules.Transaction) *modules.TxPoolTransa
 
 	txpool_tx.CreationDate = time.Now()
 	// 孤兒交易和非孤兒的交易費分开计算。
-	if ok, err := txpool.ValidateOrphanTx(tx); !ok && err == nil {
-		txpool_tx.TxFee, _ = txpool.GetTxFee(tx)
-	} else {
+	if ok, err := txpool.ValidateOrphanTx(tx); ok || err != nil {
 		// 孤兒交易的交易费暂时设置20dao, 以便计算优先级
 		txpool_tx.TxFee = &modules.AmountAsset{Amount: 20, Asset: tx.Asset()}
+	} else {
+		txpool_tx.TxFee, _ = txpool.GetTxFee(tx)
 	}
 	txpool_tx.Priority_lvl = txpool_tx.GetPriorityLvl()
 
@@ -635,8 +635,8 @@ func (pool *TxPool) add(tx *modules.TxPoolTransaction, local bool) (bool, error)
 	}
 	// Don't accept the transaction if it already in the pool .
 	hash := tx.Tx.Hash()
-	if pool.unit.HasTransaction(hash) {
-		return false, fmt.Errorf("the transactionx: %x has been packaged.", hash)
+	if has, _ := pool.unit.IsTransactionExist(hash); has {
+		return false, fmt.Errorf("the transactionx: %s has been packaged.", hash.String())
 	}
 	if _, has := pool.all.Load(hash); has {
 		log.Trace("Discarding already known transaction", "hash", hash)
@@ -677,7 +677,6 @@ func (pool *TxPool) add(tx *modules.TxPoolTransaction, local bool) (bool, error)
 		return false, err
 	}
 
-	log.Debug("fetch utxoview info:", "utxoinfo", utxoview)
 	// Check the transaction if it exists in the main chain and is not already fully spent.
 	preout := modules.OutPoint{TxHash: hash}
 	for i, msgcopy := range msgs {
@@ -696,7 +695,6 @@ func (pool *TxPool) add(tx *modules.TxPoolTransaction, local bool) (bool, error)
 			}
 		}
 	}
-	log.Debug("add output utxoview info: ", "utxoinfo", utxoview.entries[preout])
 
 	// If the transaction pool is full, discard underpriced transactions
 	length := pool.AllLength()
@@ -720,7 +718,7 @@ func (pool *TxPool) add(tx *modules.TxPoolTransaction, local bool) (bool, error)
 	log.Debugf("Add Tx[%s] to txpool.", tx.Tx.Hash().String())
 	pool.priority_sorted.Put(tx)
 	pool.all.Store(hash, tx)
-	go pool.addCache(tx)
+	pool.addCache(tx)
 	go pool.journalTx(tx)
 
 	// We've directly injected a replacement transaction, notify subsystems
@@ -900,7 +898,7 @@ func (pool *TxPool) maybeAcceptTransaction(tx *modules.Transaction, isNew, rateL
 	p_tx := TxtoTxpoolTx(pool, tx)
 	err = pool.checkPoolDoubleSpend(p_tx)
 	if err != nil {
-		log.Info("txpool check PoolDoubleSpend", "error", err)
+		log.Info("txpool check PoolDoubleSpend", "error", err, "p_tx", txHash.String())
 		return nil, nil, err
 	}
 	_, err1 := pool.add(p_tx, !pool.config.NoLocals)
@@ -1115,16 +1113,16 @@ func (pool *TxPool) DeleteTx() error {
 			continue
 		}
 		if tx.Confirmed {
-			if tx.CreationDate.Add(pool.config.Removetime).After(time.Now()) {
+			if tx.CreationDate.Add(pool.config.Removetime).Before(time.Now()) {
 				// delete
-				log.Debug("delete the confirmed tx.", "tx_hash", tx.Tx.Hash())
+				log.Debug("delete the confirmed tx.", "tx_hash", hash)
 				pool.DeleteTxByHash(hash)
 				continue
 			}
 		}
-		if tx.CreationDate.Add(pool.config.Lifetime).After(time.Now()) {
+		if tx.CreationDate.Add(pool.config.Lifetime).Before(time.Now()) {
 			// delete
-			log.Debug("delete the tx(overtime).", "tx_hash", tx.Tx.Hash())
+			log.Debug("delete the tx(overtime).", "tx_hash", hash)
 			pool.DeleteTxByHash(hash)
 			continue
 		}
@@ -1302,7 +1300,7 @@ func (pool *TxPool) checkPoolDoubleSpend(tx *modules.TxPoolTransaction) error {
 func (pool *TxPool) OutPointIsSpend(outPoint *modules.OutPoint) (bool, error) {
 	if tx, ok := pool.outpoints.Load(*outPoint); ok {
 		str := fmt.Sprintf("output %v already spent by "+
-			"transaction %x in the memory pool",
+			"transaction %x in the txpool",
 			outPoint, tx.(*modules.TxPoolTransaction).Tx.Hash())
 		return true, errors.New(str)
 	}
@@ -1454,8 +1452,8 @@ func (pool *TxPool) demoteUnexecutables() {
 func (pool *TxPool) Stop() {
 	pool.scope.Close()
 	// Unsubscribe subscriptions registered from blockchain
-	pool.chainHeadSub.Unsubscribe()
-	pool.wg.Wait()
+	// pool.chainHeadSub.Unsubscribe()
+	// pool.wg.Wait()
 	if pool.journal != nil {
 		pool.journal.close()
 	}
@@ -1567,7 +1565,7 @@ func (pool *TxPool) addCache(tx *modules.TxPoolTransaction) {
 					utxo := &modules.Utxo{Amount: out.Value, Asset: &modules.Asset{out.Asset.AssetId, out.Asset.UniqueId},
 						PkScript: out.PkScript[:]}
 					pool.outputs.Store(preout, utxo)
-					log.Debugf("add utxo to pool.outputs,outpoint:%s", preout.String())
+					//log.Debugf("add utxo to pool.outputs,outpoint:%s", preout.String())
 				}
 			}
 		}
@@ -1614,21 +1612,22 @@ func (pool *TxPool) GetSortedTxs(hash common.Hash) ([]*modules.TxPoolTransaction
 		}
 		tx := pool.priority_sorted.Get()
 		if tx == nil {
-			log.Info("Txspool get priority_pricedtx failed.", "error", "tx is null")
+			log.Infof("The task of txspool get priority_pricedtx has been finished,count:%d", len(list))
 			break
 		} else {
 			if !tx.Pending {
-				if pool.unit.HasTransaction(tx.Tx.Hash()) {
+				if has, _ := pool.unit.IsTransactionExist(tx.Tx.Hash()); has {
 					continue
 				}
 				// add precusorTxs 获取该交易的前驱交易列表
 				p_txs, _ := pool.getPrecusorTxs(tx, poolTxs, orphanTxs)
 				if len(p_txs) > 0 {
 					for _, ptx := range p_txs {
-						list = append(list, ptx)
-						total += ptx.Tx.Size()
+						if has, _ := pool.unit.IsTransactionExist(ptx.Tx.Hash()); !has {
+							list = append(list, ptx)
+							total += ptx.Tx.Size()
+						}
 					}
-
 				}
 				list = append(list, tx)
 				total += tx.Tx.Size()
@@ -1637,8 +1636,6 @@ func (pool *TxPool) GetSortedTxs(hash common.Hash) ([]*modules.TxPoolTransaction
 	}
 
 	t2 := time.Now()
-	validated_txs := make([]*modules.TxPoolTransaction, 0)
-
 	//  验证孤儿交易
 	or_list := make(orList, 0)
 	for _, tx := range orphanTxs {
@@ -1649,17 +1646,21 @@ func (pool *TxPool) GetSortedTxs(hash common.Hash) ([]*modules.TxPoolTransaction
 		sort.Sort(or_list)
 	}
 	for _, tx := range or_list {
+		txhash := tx.Tx.Hash()
+		if has, _ := pool.unit.IsTransactionExist(txhash); has {
+			go pool.orphans.Delete(txhash)
+			continue
+		}
 		ok, err := pool.ValidateOrphanTx(tx.Tx)
 		if !ok && err == nil {
 			//  更改孤儿交易的状态
 			tx.Pending = true
 			tx.UnitHash = hash
-			go pool.all.Store(tx.Tx.Hash(), tx)
-			go pool.orphans.Delete(tx.Tx.Hash())
+			go pool.all.Store(txhash, tx)
+			go pool.orphans.Delete(txhash)
 			//pool.orphans.Store(tx.Tx.Hash(), tx)
 			list = append(list, tx)
 			total += tx.Tx.Size()
-			validated_txs = append(validated_txs, tx)
 			if total > unit_size {
 				break
 			}
@@ -1676,20 +1677,13 @@ func (pool *TxPool) GetSortedTxs(hash common.Hash) ([]*modules.TxPoolTransaction
 		m[hash] = tx
 	}
 	list = make([]*modules.TxPoolTransaction, 0)
-
 	for i := 0; i < len(indexL); i++ {
 		hash, _ := indexL[i]
 		if tx, has := m[hash]; has {
 			delete(m, hash)
 			list = append(list, tx)
 			go pool.promoteTx(hash, tx)
-		} else {
-			log.Info("rm repeat error", "index", i)
 		}
-	}
-	// rm orphanTx
-	for _, tx := range validated_txs {
-		go pool.RemoveOrphan(tx)
 	}
 	// if time.Since(t2) > time.Second*1 {
 	log.Infof("get sorted and rm Orphan txs spent times: %s , count: %d ,t2: %s , txs_size %s,  total_size %s", time.Since(t0), len(list), time.Since(t2), total.String(), unit_size.String())
@@ -1753,7 +1747,7 @@ func (pool *TxPool) SubscribeTxPreEvent(ch chan<- modules.TxPreEvent) event.Subs
 }
 
 func (pool *TxPool) GetTxFee(tx *modules.Transaction) (*modules.AmountAsset, error) {
-	return tx.GetTxFee(pool.GetUtxoEntry)
+	return tx.GetTxFee(pool.GetUtxoEntry, time.Now().Unix())
 }
 
 func (pool *TxPool) limitNumberOrphans() error {
@@ -1843,7 +1837,7 @@ func (pool *TxPool) addOrphan(otx *modules.TxPoolTransaction, tag uint64) {
 					pool.outputs.Store(preout, utxo)
 					/*	pool.outputs[preout] = utxo*/
 				}
-				log.Debug(fmt.Sprintf("Stored orphan tx's hash %s (total: %d)", otx.Tx.Hash().String(), len(pool.AllOrphanTxs())))
+				log.Debugf("Stored orphan tx's hash:[%s] (total: %d)", otx.Tx.Hash().String(), len(pool.AllOrphanTxs()))
 			}
 		}
 	}

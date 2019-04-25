@@ -22,13 +22,14 @@ package validator
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/configure"
 	"github.com/palletone/go-palletone/core"
 	"github.com/palletone/go-palletone/dag/modules"
-	"time"
 )
 
 /**
@@ -117,11 +118,11 @@ func (validate *Validate) ValidateUnitExceptGroupSig(unit *modules.Unit) error {
 		return NewValidateError(UNIT_STATE_INVALID_HEADER_TXROOT)
 	}
 	// step2. check transactions in unit
-	err := validate.ValidateTransactions(unit.Txs)
-	if err != nil {
-		msg := fmt.Sprintf("Validate unit(%s) transactions failed: %v", unit.UnitHash.String(), err)
+	code := validate.validateTransactions(unit.Txs, unit.Timestamp())
+	if code != TxValidationCode_VALID {
+		msg := fmt.Sprintf("Validate unit(%s) transactions failed: %v", unit.UnitHash.String(), code)
 		log.Debug(msg)
-		return NewValidateError(UNIT_STATE_HAS_INVALID_TRANSACTIONS)
+		return NewValidateError(code)
 	}
 	//maybe orphan unit
 	if unitHeaderValidateResult != TxValidationCode_VALID {

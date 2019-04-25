@@ -55,13 +55,14 @@ func NewLesServer(ptn *ptn.PalletOne, config *ptn.Config) (*LesServer, error) {
 	gasToken := config.Dag.GetGasToken()
 	genesis, err := ptn.Dag().GetGenesisUnit()
 	if err != nil {
-		log.Error("PalletOne New", "get genesis err:", err)
+		log.Error("Light PalletOne New", "get genesis err:", err)
 		return nil, err
 	}
-	//lesserver := ptn.GetLesServer()
-	pm, err := NewProtocolManager(false, config.SyncMode, config.NetworkId, gasToken, ptn.TxPool(),
+
+	pm, err := NewProtocolManager(false, newPeerSet(), config.NetworkId, gasToken, ptn.TxPool(),
 		ptn.Dag(), ptn.EventMux(), genesis)
 	if err != nil {
+		log.Error("NewlesServer NewProtocolManager", "err", err)
 		return nil, err
 	}
 
@@ -89,18 +90,6 @@ func (s *LesServer) Protocols() []p2p.Protocol {
 // Start starts the LES server
 func (s *LesServer) Start(srvr *p2p.Server) {
 	s.protocolManager.Start(s.config.LightPeers)
-	//if srvr.DiscV5 != nil {
-	//	for _, topic := range s.lesTopics {
-	//		topic := topic
-	//		go func() {
-	//			logger := log.New("topic", topic)
-	//			logger.Info("Starting topic registration")
-	//			defer logger.Info("Terminated topic registration")
-	//
-	//			srvr.DiscV5.RegisterTopic(topic, s.quitSync)
-	//		}()
-	//	}
-	//}
 	s.privateKey = srvr.PrivateKey
 	s.protocolManager.blockLoop()
 }
@@ -310,24 +299,18 @@ func (pm *ProtocolManager) blockLoop() {
 					hash := header.Hash()
 					number := header.Number.Index
 					//td := core.GetTd(pm.chainDb, hash, number)
-					if header.Number.Index > lastHead.Number.Index {
-						//if td != nil && td.Cmp(lastBroadcastTd) > 0 {
-						//	var reorg uint64
-						//	if lastHead != nil {
-						//		reorg = lastHead.Number.Uint64() - core.FindCommonAncestor(pm.chainDb, header, lastHead).Number.Uint64()
-						//	}
+					if lastHead == nil || (header.Number.Index > lastHead.Number.Index) {
 						lastHead = header
-						//lastBroadcastTd = td
+						log.Debug("Announcing block to peers", "number", number, "hash", hash)
 
-						log.Debug("Announcing block to peers", "hash", hash, "number", number)
-
-						announce := announceData{Hash: hash, Number: number}
+						announce := announceData{Hash: hash, Number: *lastHead.Number, Header: *lastHead}
 						var (
 							signed         bool
 							signedAnnounce announceData
 						)
 
 						for _, p := range peers {
+							log.Debug("Light Palletone", "ProtocolManager->blockLoop p.announceType", p.announceType)
 							switch p.announceType {
 
 							case announceTypeSimple:

@@ -26,6 +26,7 @@ import (
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/event"
 	"github.com/palletone/go-palletone/common/p2p/discover"
+	"github.com/palletone/go-palletone/contracts/list"
 	"github.com/palletone/go-palletone/core"
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/dag/txspool"
@@ -60,7 +61,7 @@ type IDag interface {
 	GetUnitTxsHash(hash common.Hash) ([]common.Hash, error)
 	GetTransaction(hash common.Hash) (*modules.TransactionWithUnitInfo, error)
 	GetTransactionOnly(hash common.Hash) (*modules.Transaction, error)
-	HasTransaction(hash common.Hash) bool
+	IsTransactionExist(hash common.Hash) (bool, error)
 	GetTxSearchEntry(hash common.Hash) (*modules.TxLookupEntry, error)
 
 	// InsertHeaderDag inserts a batch of headers into the local chain.
@@ -121,8 +122,7 @@ type IDag interface {
 	SubscribeActiveMediatorsUpdatedEvent(ch chan<- ActiveMediatorsUpdatedEvent) event.Subscription
 	GetPrecedingMediatorNodes() map[string]*discover.Node
 	UnitIrreversibleTime() time.Duration
-	GenTransferPtnTx(from, to common.Address, daoAmount uint64, text *string,
-		txPool txspool.ITxPool) (*modules.Transaction, uint64, error)
+	GenTransferPtnTx(from, to common.Address, daoAmount uint64, text *string, txPool txspool.ITxPool) (*modules.Transaction, uint64, error)
 
 	QueryDbByKey(key []byte) ([]byte, error)
 	QueryDbByPrefix(prefix []byte) ([]*modules.DbRow, error)
@@ -149,4 +149,11 @@ type IDag interface {
 	UpdateSysParams() error
 
 	ValidateUnitExceptGroupSig(unit *modules.Unit) error
+	RefreshSysParameters()
+
+	SaveChaincode(contractId common.Address, cc *list.CCInfo) error
+	GetChaincodes(contractId common.Address) (*list.CCInfo, error)
+	GetPartitionChains() ([]*modules.PartitionChain, error)
+	GetMainChain() (*modules.MainChain, error)
+	GetCoinYearRate() float64
 }

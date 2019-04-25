@@ -57,7 +57,7 @@ if [ ! -d "$difullpath" ]; then
 	go get -u $di
 else
 	echo "di exist"
-	git -C $difullpath  pull
+#	git -C $difullpath  pull
 fi
 
 
