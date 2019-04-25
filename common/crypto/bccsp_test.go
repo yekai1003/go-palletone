@@ -97,6 +97,7 @@ func TestGmFactoryGet(t *testing.T) {
 	assert.NotNil(t, err)
 	t.Logf("Private Key:%x,SKI:%x", privKeyB, privKey.SKI())
 	getPrivKey, err := csp.GetKey(privKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: []byte("1")})
+	assert.Nil(t,err)
 	assert.Equal(t, privKey, getPrivKey)
 
 	pubKey, _ := privKey.PublicKey()
@@ -117,7 +118,7 @@ func TestGmFactoryGet(t *testing.T) {
 
 func TestS256(t *testing.T) {
 	f := &factory.SWFactory{}
-
+	var pwd []byte=[]byte("1")
 	opts := &factory.FactoryOpts{
 		SwOpts: &factory.SwOpts{
 			SecLevel:     256,
@@ -130,9 +131,10 @@ func TestS256(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, csp)
 	t.Log("Try to generate new key")
-	privKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{Password: []byte("1")})
+	privKey, err := csp.KeyGen(&bccsp.ECDSAS256KeyGenOpts{Password: pwd})
 	assert.Nil(t, err)
-	getPrivKey, err := csp.GetKey(privKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: []byte("1")})
+	getPrivKey, err := csp.GetKey(privKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: pwd})
+	assert.Nil(t,err)
 	assert.Equal(t, privKey, getPrivKey)
 
 	privKeyB, err := privKey.Bytes()
@@ -156,13 +158,13 @@ func TestS256(t *testing.T) {
 	pubKey2, err := csp.KeyImport(pubKeyB, &bccsp.ECDSAS256PublicKeyImportOpts{})
 	assert.Nil(t, err)
 	t.Log(pubKey2.Bytes())
-	key3, err := csp.GetKey(pubKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: []byte("1")})
+	key3, err := csp.GetKey(pubKey.SKI(), &bccsp.ECDSAGetKeyOpts{Password: pwd})
 	assert.Nil(t, err)
 	t.Log(key3.Bytes())
 }
 
 func TestMain(m *testing.M) {
-	_, err := Init(HashType_SHA3_256, CryptoType_ECDSA_P256, os.TempDir())
+	_, err := Init(HashType_SHA3_256, CryptoType_ECDSA_S256, os.TempDir())
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -181,27 +183,28 @@ func BenchmarkHash(b *testing.B) {
 	}
 }
 func TestSignByAddress(t *testing.T) {
+	pwd:=[]byte("1")
 	hash := []byte("Devin")
-	addr, err := GenerateNewAddress()
+	addr, err := GenerateNewAddress(pwd)
 	assert.Nil(t, err)
 	t.Logf("New Address:%s", addr.String())
-	signature, err := SignByAddress(hash, addr)
+	signature, err := SignByAddress(hash, addr,pwd)
 	assert.Nil(t, err)
-	t.Log("Signature", signature)
+	t.Logf("Signature:%x", signature)
 
-	pubKey, err := GetPubKeyByAddress(addr)
+	pubKey, err := GetPubKeyByAddress(addr,pwd)
 	assert.Nil(t, err)
-	t.Log("Public key:", pubKey)
+	t.Logf("Public key:%x", pubKey)
 	pass := VerifySign(pubKey, hash, signature)
 	assert.True(t, pass)
 }
 func BenchmarkSignByAddress(b *testing.B) {
-	addr, err := GenerateNewAddress()
+	addr, err := GenerateNewAddress(nil)
 	assert.Nil(b, err)
 	b.Logf("New Address:%s", addr.String())
 	for i := 0; i < b.N; i++ {
 		hash := []byte(fmt.Sprintf("Devin%d", i))
-		signature, err := SignByAddress(hash, addr)
+		signature, err := SignByAddress(hash, addr,nil)
 		assert.Nil(b, err)
 		b.Log("Signature", signature)
 	}

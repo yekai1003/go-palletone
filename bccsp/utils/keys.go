@@ -194,7 +194,20 @@ func PrivateKeyToEncryptedPEM(privateKey interface{}, pwd []byte) ([]byte, error
 		var raw []byte
 		var err error
 		if k.Curve == btcec.S256() {
-			raw = FromECDSA(k)
+			oidNamedCurve, ok := oidFromNamedCurve(k.Curve)
+			if !ok {
+				return nil, errors.New("unknown elliptic curve")
+			}
+
+			var pkcs8Key pkcs8Info
+			pkcs8Key.Version = 0
+			pkcs8Key.PrivateKeyAlgorithm = make([]asn1.ObjectIdentifier, 2)
+			pkcs8Key.PrivateKeyAlgorithm[0] = oidPublicKeyECDSA
+			pkcs8Key.PrivateKeyAlgorithm[1] = oidNamedCurve
+
+			pkcs8Key.PrivateKey = FromECDSA(k)
+
+			raw, err = asn1.Marshal(pkcs8Key)
 		} else {
 			raw, err = x509.MarshalECPrivateKey(k)
 
