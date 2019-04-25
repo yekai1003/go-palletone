@@ -114,7 +114,7 @@ func CompressPubkey(pubkey *ecdsa.PublicKey) []byte {
 }
 // CompressPubkey encodes a public key to the 33-byte compressed format.
 func CompressPubkeySm2(pubkey *sm2.PublicKey) []byte {
-	return (*btcec.PublicKey)(pubkey).SerializeCompressed()
+	return sm2.Compress(pubkey)
 }
 // S256 returns an instance of the secp256k1 curve.
 func S256() elliptic.Curve {
