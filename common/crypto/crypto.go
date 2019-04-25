@@ -23,13 +23,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/btcsuite/btcutil/base58"
-	"github.com/palletone/go-palletone/common"
-	"github.com/palletone/go-palletone/common/math"
 	"io"
 	"io/ioutil"
 	"math/big"
 	"os"
+
+	"github.com/btcsuite/btcutil/base58"
+	"github.com/palletone/go-palletone/common"
+	"github.com/palletone/go-palletone/common/math"
 )
 
 var (

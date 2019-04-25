@@ -239,7 +239,7 @@ func (ks *KeyStore) Delete(a accounts.Account, passphrase string) error {
 	// immediately afterwards.
 	a, key, err := ks.getDecryptedKey(a, passphrase)
 	if key != nil {
-		ZeroKey(key.PrivateKey)
+		ZeroKey(key.PrivateKeyB)
 	}
 	if err != nil {
 		return err
@@ -267,7 +267,7 @@ func (ks *KeyStore) SignHash(addr common.Address, hash []byte) ([]byte, error) {
 		return nil, ErrLocked
 	}
 	// Sign the hash using plain ECDSA operations
-	return crypto.Sign(hash, unlockedKey.PrivateKey)
+	return crypto.SignByPrivateKey(hash, unlockedKey.PrivateKeyB)
 }
 
 // SignTx signs the given transaction with the requested account.
@@ -299,18 +299,18 @@ func (ks *KeyStore) SignHashWithPassphrase(a accounts.Account, passphrase string
 	if err != nil {
 		return nil, err
 	}
-	defer ZeroKey(key.PrivateKey)
-	return crypto.Sign(hash, key.PrivateKey)
+	defer ZeroKey(key.PrivateKeyB)
+	return crypto.SignByPrivateKey(hash, key.PrivateKeyB)
 }
 func (ks *KeyStore) VerifySignatureWithPassphrase(a accounts.Account, passphrase string, hash []byte, signature []byte) (pass bool, err error) {
 	_, key, err := ks.getDecryptedKey(a, passphrase)
 	if err != nil {
 		return false, err
 	}
-	defer ZeroKey(key.PrivateKey)
-	pk := key.PrivateKey.PublicKey
+	defer ZeroKey(key.PrivateKeyB)
+	pk := key.PublicKeyB
 	sig := signature[:len(signature)-1] // remove recovery id
-	return crypto.VerifySignature(crypto.FromECDSAPub(&pk), hash, sig), nil
+	return crypto.VerifySign(pk, hash, sig), nil
 }
 
 // SignTxWithPassphrase signs the transaction if the private key matching the
@@ -320,7 +320,7 @@ func (ks *KeyStore) SignTxWithPassphrase(a accounts.Account, passphrase string, 
 	if err != nil {
 		return nil, err
 	}
-	defer ZeroKey(key.PrivateKey)
+	defer ZeroKey(key.PrivateKeyB)
 
 	//authen, err := ks.SigTXWithPwd(tx, key.PrivateKey)
 	//if err != nil {
@@ -376,7 +376,7 @@ func (ks *KeyStore) TimedUnlock(a accounts.Account, passphrase string, timeout t
 		if u.abort == nil {
 			// The address was unlocked indefinitely, so unlocking
 			// it with a timeout would be confusing.
-			ZeroKey(key.PrivateKey)
+			ZeroKey(key.PrivateKeyB)
 			return nil
 		}
 		// Terminate the expire goroutine and replace it below.
@@ -429,7 +429,7 @@ func (ks *KeyStore) expire(addr common.Address, u *unlocked, timeout time.Durati
 		// because the map stores a new pointer every time the key is
 		// unlocked.
 		if ks.unlocked[addr] == u {
-			ZeroKey(u.PrivateKey)
+			ZeroKey(u.PrivateKeyB)
 			delete(ks.unlocked, addr)
 		}
 		ks.mu.Unlock()
@@ -470,23 +470,23 @@ func (ks *KeyStore) DumpKey(a accounts.Account, passphrase string) (privateKey [
 	if err != nil {
 		return nil, err
 	}
-	return crypto.FromECDSA(key.PrivateKey), nil
+	return key.PrivateKeyB, nil
 
 }
-func (ks *KeyStore) DumpPrivateKey(a accounts.Account, passphrase string) (privateKey *ecdsa.PrivateKey, err error) {
-	_, key, err := ks.getDecryptedKey(a, passphrase)
-	if err != nil {
-		return nil, err
-	}
-	return key.PrivateKey, nil
-
-}
+//func (ks *KeyStore) DumpPrivateKey(a accounts.Account, passphrase string) (privateKey *ecdsa.PrivateKey, err error) {
+//	_, key, err := ks.getDecryptedKey(a, passphrase)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return key.PrivateKey, nil
+//
+//}
 
 // Import stores the given encrypted JSON key into the key directory.
 func (ks *KeyStore) Import(keyJSON []byte, passphrase, newPassphrase string) (accounts.Account, error) {
 	key, err := DecryptKey(keyJSON, passphrase)
-	if key != nil && key.PrivateKey != nil {
-		defer ZeroKey(key.PrivateKey)
+	if key != nil && key.PrivateKeyB != nil {
+		defer ZeroKey(key.PrivateKeyB)
 	}
 	if err != nil {
 		return accounts.Account{}, err
@@ -523,14 +523,14 @@ func (ks *KeyStore) Update(a accounts.Account, passphrase, newPassphrase string)
 }
 
 // ZeroKey zeroes a private key in memory.
-func ZeroKey(k *ecdsa.PrivateKey) {
-	b := k.D.Bits()
+func ZeroKey(b []byte) {
+	//b := k.D.Bits()
 	for i := range b {
 		b[i] = 0
 	}
 }
 
-func (ks *KeyStore) getPrivateKey(address common.Address) (*ecdsa.PrivateKey, error) {
+func (ks *KeyStore) getPrivateKey(address common.Address) ([]byte, error) {
 	// Look up the key to sign with and abort if it cannot be found
 	ks.mu.RLock()
 	defer ks.mu.RUnlock()
@@ -538,7 +538,7 @@ func (ks *KeyStore) getPrivateKey(address common.Address) (*ecdsa.PrivateKey, er
 	if !found {
 		return nil, ErrLocked
 	}
-	return unlockedKey.PrivateKey, nil
+	return unlockedKey.PrivateKeyB, nil
 }
 
 func (ks *KeyStore) GetPublicKey(address common.Address) ([]byte, error) {
@@ -549,7 +549,7 @@ func (ks *KeyStore) GetPublicKey(address common.Address) ([]byte, error) {
 	if !found {
 		return nil, ErrLocked
 	}
-	return crypto.CompressPubkey(&unlockedKey.PrivateKey.PublicKey), nil
+	return unlockedKey.PublicKeyB, nil
 }
 
 func (ks *KeyStore) SigUnit(unitHeader *modules.Header, address common.Address) ([]byte, error) {
@@ -569,7 +569,7 @@ func (ks *KeyStore) SigData(data interface{}, address common.Address) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	sign, err := crypto.Sign(hash.Bytes(), privateKey)
+	sign, err := crypto.SignByPrivateKey(hash.Bytes(), privateKey)
 	if err != nil {
 		return nil, err
 	}

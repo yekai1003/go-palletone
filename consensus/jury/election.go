@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/dag/errors"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/log"
@@ -77,7 +78,11 @@ func (e *elector) checkElected(data []byte) (proof []byte, err error) {
 	a := accounts.Account{
 		Address: e.addr,
 	}
-	privateKey, err := e.ks.DumpPrivateKey(a, e.password)
+	privateKeyB, err := e.ks.DumpKey(a, e.password)
+	if err != nil {
+		return nil, err
+	}
+	privateKey,err:=crypto.ToECDSA(privateKeyB)
 	if err != nil {
 		return nil, err
 	}

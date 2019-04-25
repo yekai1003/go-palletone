@@ -52,6 +52,7 @@ type CryptoLib struct {
 	hashOpt             bccsp.HashOpts
 	keyImportOpt        bccsp.KeyImportOpts
 	tempPubkeyImportOpt bccsp.KeyImportOpts
+	tempPrvkeyImportOpt bccsp.KeyImportOpts
 	keyGenOpt           bccsp.KeyGenOpts
 	tempkeyGenOpt       bccsp.KeyGenOpts
 	cacheAddrPriKey     map[common.Address]bccsp.Key
@@ -112,10 +113,12 @@ func Init(hashType HashType, cryptoType CryptoType, keystorePath string) (*Crypt
 	}
 	cryptoLib.keyImportOpt = &bccsp.ECDSAPrivateKeyImportOpts{Format: bccsp.ECDSAPrivateKeyFormat_Hex}
 	cryptoLib.tempPubkeyImportOpt = &bccsp.ECDSAS256PublicKeyImportOpts{Temporary: true}
+	cryptoLib.tempPrvkeyImportOpt = &bccsp.ECDSAPrivateKeyImportOpts{Format: bccsp.ECDSAPrivateKeyFormat_Hex,Temporary: true}
 	cryptoLib.keyGenOpt = &bccsp.ECDSAS256KeyGenOpts{Temporary: false}
 	cryptoLib.tempkeyGenOpt = &bccsp.ECDSAS256KeyGenOpts{Temporary: true}
 	if cryptoType == CryptoType_GM2_256 {
 		cryptoLib.keyImportOpt = &bccsp.GMSM2PrivateKeyImportOpts{}
+		cryptoLib.tempPrvkeyImportOpt = &bccsp.GMSM2PrivateKeyImportOpts{Temporary:true}
 		cryptoLib.tempPubkeyImportOpt = &bccsp.GMSM2PublicKeyImportOpts{Temporary: true}
 		cryptoLib.keyGenOpt = &bccsp.GMSM2KeyGenOpts{}
 		cryptoLib.tempkeyGenOpt = &bccsp.GMSM2KeyGenOpts{Temporary: true}
@@ -232,6 +235,22 @@ func SignByAddress(hash []byte, addr common.Address, password []byte) ([]byte, e
 		}
 	}
 	return myCryptoLib.SignByAddress(hash, addr, password)
+}
+func (lib *CryptoLib) SignByPrivateKey(hash []byte, privateKey []byte) ([]byte, error) {
+	prvKey, err := lib.csp.KeyImport(privateKey, lib.tempPrvkeyImportOpt)
+	if err != nil {
+		return nil,err
+	}
+	return lib.csp.Sign(prvKey, hash, nil)
+}
+func SignByPrivateKey(hash []byte, privateKey []byte) ([]byte, error) {
+	if myCryptoLib == nil {
+		_, err := InitDefaultCryptoLib()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return myCryptoLib.SignByPrivateKey(hash, privateKey)
 }
 func (lib *CryptoLib) GetPubKeyByAddress(addr common.Address, password []byte) ([]byte, error) {
 	if pubkey, ok := lib.cacheAddrPubKey[addr]; ok {

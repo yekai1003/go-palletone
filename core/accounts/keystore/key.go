@@ -44,8 +44,9 @@ type Key struct {
 	Address common.Address
 	// we only store privkey as pubkey/address can be derived from it
 	// privkey in this struct is always in plaintext
-	PrivateKey  *ecdsa.PrivateKey
+	//PrivateKey  *ecdsa.PrivateKey
 	PrivateKeyB []byte
+	PublicKeyB []byte
 }
 
 type keyStore interface {
@@ -94,7 +95,7 @@ type cipherparamsJSON struct {
 func (k *Key) MarshalJSON() (j []byte, err error) {
 	jStruct := plainKeyJSON{
 		hex.EncodeToString(k.Address[:]),
-		hex.EncodeToString(crypto.FromECDSA(k.PrivateKey)),
+		hex.EncodeToString(k.PrivateKeyB),
 		k.Id.String(),
 		version,
 	}
@@ -116,13 +117,14 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 	if err != nil {
 		return err
 	}
-	privkey, err := crypto.HexToECDSA(keyJSON.PrivateKey)
+
+	privkey, err := hex.DecodeString(keyJSON.PrivateKey)
 	if err != nil {
 		return err
 	}
 
 	k.Address = common.BytesToAddress(addr)
-	k.PrivateKey = privkey
+	k.PrivateKeyB = privkey
 
 	return nil
 }
@@ -132,7 +134,7 @@ func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
 	key := &Key{
 		Id:         id,
 		Address:    crypto.PubkeyToAddress(&privateKeyECDSA.PublicKey),
-		PrivateKey: privateKeyECDSA,
+		PrivateKeyB: crypto.FromECDSA( privateKeyECDSA),
 	}
 	return key
 }
@@ -186,7 +188,7 @@ func storeNewKey(ks keyStore, rand io.Reader, auth string) (*Key, accounts.Accou
 	}
 	a := accounts.Account{Address: key.Address, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(key.Address))}}
 	if err := ks.StoreKey(a.URL.Path, key, auth); err != nil {
-		ZeroKey(key.PrivateKey)
+		ZeroKey(key.PrivateKeyB)
 		return nil, a, err
 	}
 	return key, a, err
