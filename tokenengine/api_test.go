@@ -213,7 +213,7 @@ func TestSm2SignAndVerifyATx(t *testing.T) {
 	t.Logf("UnlockScript:%x", unlockScript)
 	s, _ := DisasmString(unlockScript)
 	t.Logf("UnlockScript string:%s", s)
-	err = ScriptValidate(lockScript, nil, tx, 0, 0)
+	err = ScriptValidateSm2(lockScript, nil, tx, 0, 0)
 	if err != nil {
 		t.Logf("validate error:%s", err)
 	}
@@ -221,7 +221,7 @@ func TestSm2SignAndVerifyATx(t *testing.T) {
 	//textPayload.Text=[]byte("Bad")
 	//fmt.Printf("%s", tx.TxMessages[2].Payload.(*modules.DataPayload))
 
-	err = ScriptValidate(lockScript, nil, tx, 1, 0)
+	err = ScriptValidateSm2(lockScript, nil, tx, 1, 0)
 	assert.Nil(t, err, fmt.Sprintf("validate error:%s", err))
 
 }
