@@ -26,7 +26,7 @@ import (
 	"sort"
 
 	"fmt"
-	//"github.com/tjfoc/gmsm/sm2"
+	"github.com/tjfoc/gmsm/sm2"
 	"github.com/tjfoc/gmsm/sm3"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
@@ -194,6 +194,8 @@ func ScriptValidate(utxoLockScript []byte, pickupJuryRedeemScript txscript.Picku
 		log.Error("Failed to create script: ", err)
 		return err
 	}
+      return vm.Execute()
+}
 func ScriptValidateSm2(utxoLockScript []byte, pickupJuryRedeemScript txscript.PickupJuryRedeemScript, tx *modules.Transaction, msgIdx, inputIndex int) error {
 	acc := &accountsm2{}
 	vm, err := txscript.NewEngine(utxoLockScript, pickupJuryRedeemScript, tx, msgIdx, inputIndex, txscript.StandardVerifyFlags, nil, acc)
