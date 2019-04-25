@@ -194,6 +194,15 @@ func ScriptValidate(utxoLockScript []byte, pickupJuryRedeemScript txscript.Picku
 		log.Error("Failed to create script: ", err)
 		return err
 	}
+func ScriptValidateSm2(utxoLockScript []byte, pickupJuryRedeemScript txscript.PickupJuryRedeemScript, tx *modules.Transaction, msgIdx, inputIndex int) error {
+	acc := &accountsm2{}
+	vm, err := txscript.NewEngine(utxoLockScript, pickupJuryRedeemScript, tx, msgIdx, inputIndex, txscript.StandardVerifyFlags, nil, acc)
+	
+	if err != nil {
+		log.Error("Failed to create script: ", err)
+		return err
+	}
+
 	return vm.Execute()
 }
 
@@ -255,14 +264,15 @@ func (a *accountsm2) Sign(address common.Address, digest []byte) ([]byte, error)
 	return a.signFn(address, digest)
 }
 func (a *accountsm2) Verify( pubKey , signature, digest []byte) (bool, error) {
-	/*ok := pubKey.Verify(digest, signature) // 公钥验证
+	spubKey:=sm2.Decompress(pubKey) 
+	ok := spubKey.Verify(digest, signature) // 公钥验证
 	if ok != true {
 		fmt.Printf("Verify error\n")
 	} else {
 		fmt.Printf("Verify ok\n")
 	}
-	return ok, nil*/
-	return crypto.VerifySignature(pubKey, digest, signature), nil
+	return ok, nil
+	//return crypto.VerifySignature(pubKey, digest, signature), nil
 }
 func (a *accountsm2) GetPubKey(address common.Address) ([]byte, error) {
 	return a.pubKeyFn(address)
