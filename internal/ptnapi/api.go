@@ -1620,7 +1620,7 @@ func createTokenTx(fromAddr, toAddr common.Address, amountToken uint64, feePTN u
 
 //sign raw tx
 func signTokenTx(tx *modules.Transaction, cmdInputs []ptnjson.RawTxInput, flags string,
-	pubKeyFn tokenengine.AddressGetPubKeySm2, hashFn tokenengine.AddressGetSignSm2) error {
+	pubKeyFn tokenengine.AddressGetPubKey, hashFn tokenengine.AddressGetSign) error {
 	var hashType uint32
 	switch flags {
 	case "ALL":
@@ -1986,7 +1986,7 @@ func SignRawTransaction(icmd interface{}, pubKeyFn tokenengine.AddressGetPubKeyS
 	//}
 
 	var signErrs []common.SignatureError
-	signErrs, err = tokenengine.SignTxAllPaymentInput(tx, hashType, inputpoints, redeem, pubKeyFn, hashFn)
+	signErrs, err = tokenengine.SignTxAllPaymentInputSm2(tx, hashType, inputpoints, redeem, pubKeyFn, hashFn)
 	if err != nil {
 		return ptnjson.SignRawTransactionResult{}, DeserializationError{err}
 	}

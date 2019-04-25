@@ -297,6 +297,51 @@ func CalcSignatureHash(tx *modules.Transaction, hashType uint32, msgIdx, inputId
 
 //Sign a full transaction
 func SignTxAllPaymentInput(tx *modules.Transaction, hashType uint32, utxoLockScripts map[modules.OutPoint][]byte,
+	redeemScript []byte, pubKeyFn AddressGetPubKey, hashFn AddressGetSign) ([]common.SignatureError, error) {
+
+	lookupRedeemScript := func(a common.Address) ([]byte, error) {
+
+		return redeemScript, nil
+	}
+	tmpAcc := &account{pubKeyFn: pubKeyFn, signFn: hashFn}
+	var signErrors []common.SignatureError
+	for i, msg := range tx.TxMessages {
+		if msg.App == modules.APP_PAYMENT {
+			pay, ok := msg.Payload.(*modules.PaymentPayload)
+			if !ok {
+				return nil, errors.New("Invalid payment message")
+			}
+			for j, input := range pay.Inputs {
+				utxoLockScript, find := utxoLockScripts[*input.PreviousOutPoint]
+				if !find {
+					errMsg := fmt.Sprintf("Don't find utxo for outpoint[%s]", input.PreviousOutPoint.String())
+					log.Error(errMsg)
+					return nil, errors.New(errMsg)
+				}
+				checkscript := make([]byte, len(utxoLockScript))
+				copy(checkscript, utxoLockScript)
+				if (hashType&uint32(txscript.SigHashSingle)) != uint32(txscript.SigHashSingle) || j < len(pay.Outputs) {
+					sigScript, err := txscript.SignTxOutput(tx, i, j, utxoLockScript, txscript.SigHashType(hashType),
+						tmpAcc, txscript.ScriptClosure(lookupRedeemScript),
+						input.SignatureScript)
+					if err != nil {
+						signErrors = append(signErrors, common.SignatureError{
+							InputIndex: uint32(j),
+							MsgIndex:   uint32(i),
+							Error:      err,
+						})
+						return signErrors, err
+					}
+					input.SignatureScript = sigScript
+					checkscript = nil
+				}
+			}
+		}
+	}
+	return signErrors, nil
+}
+//Sign a full transaction
+func SignTxAllPaymentInputSm2(tx *modules.Transaction, hashType uint32, utxoLockScripts map[modules.OutPoint][]byte,
 	redeemScript []byte, pubKeyFn AddressGetPubKeySm2, hashFn AddressGetSignSm2) ([]common.SignatureError, error) {
 
 	lookupRedeemScript := func(a common.Address) ([]byte, error) {
@@ -340,7 +385,6 @@ func SignTxAllPaymentInput(tx *modules.Transaction, hashType uint32, utxoLockScr
 	}
 	return signErrors, nil
 }
-
 //传入一个脚本二进制，解析为可读的文本形式
 func DisasmString(script []byte) (string, error) {
 	return txscript.DisasmString(script)

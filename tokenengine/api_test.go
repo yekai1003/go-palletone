@@ -205,7 +205,7 @@ func TestSm2SignAndVerifyATx(t *testing.T) {
 	}
 	var hashtype uint32
 	hashtype = 1
-	_, err = SignTxAllPaymentInput(tx, hashtype, lockScripts, nil, getPubKeyFn, getSignFn)
+	_, err = SignTxAllPaymentInputSm2(tx, hashtype, lockScripts, nil, getPubKeyFn, getSignFn)
 	if err != nil {
 		t.Logf("Sign error:%s", err)
 	}
