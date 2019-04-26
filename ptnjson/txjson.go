@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"encoding/hex"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/dag/modules"
 )
@@ -58,6 +59,8 @@ type TplJson struct {
 	Version    string `json:"version"`
 	Memory     uint16 `json:"memory"`
 	Bytecode   []byte `json:"bytecode"` // contract bytecode
+	BytecodeSize int    `json:"bytecode_size"` // contract bytecode
+	AddrHash   string `json:"addr_hash"`
 }
 type DeployJson struct {
 	TemplateId string   `json:"template_id"`
@@ -76,6 +79,8 @@ type InvokeJson struct {
 	ReadSet      string   `json:"read_set"`  // the set data of read, and value could be any type
 	WriteSet     string   `json:"write_set"` // the set data of write, and value could be any type
 	Payload      []byte   `json:"payload"`   // the contract execution result
+	ErrorCode    uint32   `json:"error_code"`
+	ErrorMessage string   `json:"error_message"`
 }
 type StopJson struct {
 	ContractId string   `json:"contract_id"`
@@ -188,13 +193,18 @@ func ConvertJson2Tx(json *TxJson) *modules.Transaction {
 }
 func convertTpl2Json(tpl *modules.ContractTplPayload) *TplJson {
 	tpljson := new(TplJson)
-	hash := common.BytesToHash(tpl.TemplateId[:])
-	tpljson.TemplateId = hash.String()
+	//hash := common.BytesToHash(tpl.TemplateId[:])
+	tpljson.TemplateId = hex.EncodeToString(tpl.TemplateId)
 	tpljson.Name = tpl.Name
 	tpljson.Path = tpl.Path
 	tpljson.Version = tpl.Version
-	tpljson.Bytecode = tpl.Bytecode[:]
+	tpljson.Bytecode = tpl.ByteCode[:]
+	tpljson.BytecodeSize = len(tpl.ByteCode[:])
 	tpljson.Memory = tpl.Memory
+
+	ah, _ := json.Marshal(tpl.AddrHash)
+	tpljson.AddrHash = string(ah)
+
 	return tpljson
 }
 func convertDeploy2Json(deploy *modules.ContractDeployPayload) *DeployJson {
@@ -229,6 +239,10 @@ func convertInvoke2Json(invoke *modules.ContractInvokePayload) *InvokeJson {
 	wset, _ := json.Marshal(invoke.WriteSet)
 	injson.WriteSet = string(wset)
 	injson.Payload = invoke.Payload
+	//if invoke.ErrMsg!=nil{
+	injson.ErrorCode = invoke.ErrMsg.Code
+	injson.ErrorMessage = invoke.ErrMsg.Message
+	//}
 	return injson
 }
 func convertStop2Json(stop *modules.ContractStopPayload) *StopJson {
