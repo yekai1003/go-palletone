@@ -398,7 +398,8 @@ func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 		// Uncompressed
 		return nil
 	}
-	return ErrStackInvalidPubKey
+        return nil
+	//return ErrStackInvalidPubKey
 }
 
 // checkSignatureEncoding returns whether or not the passed signature adheres to

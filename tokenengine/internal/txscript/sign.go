@@ -7,7 +7,6 @@ package txscript
 import (
 	"errors"
 	"fmt"
-
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/dag/modules"
 )
@@ -23,13 +22,10 @@ func RawTxInSignature(tx *modules.Transaction, msgIdx, idx int, subScript []byte
 	}
 	hash := calcSignatureHash(parsedScript, hashType, tx, msgIdx, idx, crypto)
 	sign, err := crypto.Sign(addr, hash)
-	return append(sign[0:64], byte(hashType)), nil
-	//signature, err := key.Sign(hash)
-	//if err != nil {
-	//	return nil, fmt.Errorf("cannot sign tx input: %s", err)
-	//}
-	//
-	//return append(signature.Serialize(), byte(hashType)), nil
+	if err != nil {
+		return nil, fmt.Errorf("cannot calcSignatureHash: %v", err)
+	}
+	return append(sign, byte(hashType)), nil
 }
 
 // SignatureScript creates an input signature script for tx to spend BTC sent

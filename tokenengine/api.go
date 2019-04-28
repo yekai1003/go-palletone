@@ -24,7 +24,7 @@ import (
 	"bytes"
 	"errors"
 	"sort"
-
+    "math/big"
 	"fmt"
 	"github.com/tjfoc/gmsm/sm2"
 	"github.com/tjfoc/gmsm/sm3"
@@ -32,7 +32,7 @@ import (
 	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/dag/modules"
-	"github.com/palletone/go-palletone/tokenengine/internal/txscript"
+	"github.com/palletone/go-palletone/tokenengine/internal/txscript" 
 )
 
 const (
@@ -267,12 +267,17 @@ func (a *accountsm2) Sign(address common.Address, digest []byte) ([]byte, error)
 }
 func (a *accountsm2) Verify( pubKey , signature, digest []byte) (bool, error) {
 	spubKey:=sm2.Decompress(pubKey) 
-	ok := spubKey.Verify(digest, signature) // 公钥验证
-	if ok != true {
-		fmt.Printf("Verify error\n")
-	} else {
-		fmt.Printf("Verify ok\n")
-	}
+    var priv sm2.PrivateKey
+	priv.PublicKey = *spubKey
+    count,_ := new(big.Int), big.NewInt(1)
+    count.SetString("101043682827867233478401557417770295959083996149035547360371888391381060544498",10)
+    priv.D = count
+    ok := priv.Verify(digest, signature) // �~E��~R��~L�~A
+    if ok != true {
+            fmt.Printf("accountsm2 sm2 Verify error\n")
+    } else {
+            fmt.Printf("accountsm2 sm2 Verify ok\n")
+    }
 	return ok, nil
 	//return crypto.VerifySignature(pubKey, digest, signature), nil
 }

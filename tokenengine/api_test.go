@@ -26,6 +26,7 @@ import (
 	//"github.com/palletone/go-palletone/tokenengine/btcd/chaincfg/chainhash"
 	"encoding/hex"
 	"fmt"
+        "math/big"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
 
@@ -154,11 +155,14 @@ func TestSignAndVerifyATx(t *testing.T) {
 }
 
 func TestSm2SignAndVerifyATx(t *testing.T) {
-        privateKey, err := sm2.GenerateKey()
+    privateKey, err := sm2.GenerateKey()
 	if err != nil {
 		 t.Logf("get privken is err")
 	}
 	pubKey := privateKey.PublicKey
+    //spubKey:=sm2.Compress(&pubKey)
+    //ss := hex.EncodeToString(spubKey) 
+    //h, _ := hex.DecodeString(ss)
 	pubKeyBytes := crypto.CompressPubkeySm2(&pubKey)
 	pubKeyHash := crypto.Hash160(pubKeyBytes)
 	t.Logf("Public Key:%x", pubKeyBytes)
@@ -198,10 +202,10 @@ func TestSm2SignAndVerifyATx(t *testing.T) {
 	getSignFn := func(addr common.Address, hash []byte) ([]byte, error) {
 		sign, err := privateKey.Sign(rand.Reader, hash, nil) // 签名
 		if err != nil {
-                     t.Logf("getsignfn is err")
+            t.Logf("getsignfn is err")
 		}
 		//s, e := crypto.Sign(hash, privKey)
-		return sign[0:64], err  
+		return sign, err  
 	}
 	var hashtype uint32
 	hashtype = 1
@@ -286,6 +290,85 @@ func TestHashNone1Payment(t *testing.T) {
 	assert.Nil(t, err, fmt.Sprintf("validate error:%s", err))
 }
 
+func TestSm2HashNone1Payment(t *testing.T) {
+	//privKeyBytes, _ := hex.DecodeString("2BE3B4B671FF5B8009E6876CCCC8808676C1C279EE824D0AB530294838DC1644")
+        //privateKey, err := sm2.GenerateKey()
+	//if err != nil {
+	//	 t.Logf("get privken is err")
+	//}
+	ss:="00f9b07df0b25765d4a1bb22212e370e842f3257c9d818b6a7e5382f6e5bfc63e8"
+	var privateKey sm2.PrivateKey
+	h, _ := hex.DecodeString(ss)
+	ds := sm2.Decompress(h)
+	privateKey.PublicKey = *ds
+	count,_ := new(big.Int), big.NewInt(1)
+	count.SetString("101043682827867233478401557417770295959083996149035547360371888391381060544498",10)
+	privateKey.D = count
+	pubKey := privateKey.PublicKey
+
+	spubKey:=sm2.Compress(&pubKey)
+	as:=hex.EncodeToString(spubKey)
+	as = as
+	pubKeyBytes := crypto.CompressPubkeySm2(&pubKey)
+	pubKeyHash := crypto.Hash160(pubKeyBytes)
+	t.Logf("Public Key:%x", pubKeyBytes)
+	addr := crypto.PubkeyToAddressSm2(&pubKey)
+	t.Logf("Addr:%s", addr.String())
+	lockScript := GenerateP2PKHLockScript(pubKeyHash)
+	t.Logf("UTXO lock script:%x", lockScript)
+
+	tx := &modules.Transaction{
+		TxMessages: make([]*modules.Message, 0),
+	}
+	payment := &modules.PaymentPayload{}
+	utxoTxId := common.HexToHash("5651870aa8c894376dbd960a22171d0ad7be057a730e14d7103ed4a6dbb34873")
+	outPoint := modules.NewOutPoint(utxoTxId, 0, 0)
+	txIn := modules.NewTxIn(outPoint, []byte{})
+	payment.AddTxIn(txIn)
+	asset0 := modules.NewPTNAsset()
+
+	tx.TxMessages = append(tx.TxMessages, modules.NewMessage(modules.APP_PAYMENT, payment))
+
+	//tx.TxMessages = append(tx.TxMessages, modules.NewMessage(modules.APP_DATA, &modules.DataPayload{MainData: []byte("Hello PalletOne")}))
+
+	lockScripts := map[modules.OutPoint][]byte{
+		*outPoint: lockScript[:],
+	}
+
+	getPubKeyFn := func(common.Address) ([]byte, error) {
+		return crypto.CompressPubkeySm2(&pubKey), nil
+	}
+	getSignFn := func(addr common.Address, hash []byte) ([]byte, error) {
+	sign, err := privateKey.Sign(rand.Reader, hash, nil) // 签名
+	    fmt.Println("api_test before sign hash is ",hash)
+		if err != nil {
+		    t.Logf("getsignfn is err")
+		}
+	    return sign, err  
+	}
+	var hashtype uint32
+	hashtype = SigHashNone
+	_, err := SignTxAllPaymentInputSm2(tx, hashtype, lockScripts, nil, getPubKeyFn, getSignFn)
+	if err != nil {
+		t.Logf("Sign error:%s", err)
+	}
+	unlockScript := tx.TxMessages[0].Payload.(*modules.PaymentPayload).Inputs[0].SignatureScript
+	t.Logf("UnlockScript:%x", unlockScript)
+	s, _ := DisasmString(unlockScript)
+	t.Logf("UnlockScript string:%s", s)
+	//Add any output
+	tx.TxMessages[0].Payload.(*modules.PaymentPayload).AddTxOut(modules.NewTxOut(1, lockScript, asset0))
+	err = ScriptValidateSm2(lockScript, nil, tx, 0, 0)
+	if err != nil {
+		t.Logf("validate error:%s", err)
+	}
+	// textPayload :=tx.TxMessages[2].Payload.(*modules.DataPayload)
+	//textPayload.Text=[]byte("Bad")
+	//fmt.Printf("%s", tx.TxMessages[2].Payload.(*modules.DataPayload))
+
+	//err = ScriptValidate(lockScript, nil, tx, 1, 0)
+	assert.Nil(t, err, fmt.Sprintf("validate error:%s", err))
+}
 var (
 	prvKey1, _  = crypto.FromWIF("KwN8TdhAMeU8b9UrEYTNTVEvDsy9CSyepwRVNEy2Fc9nbGqDZw4J") //"0454b0699a590b6fc8e66e81db1ca36e99d7c767cdfe44a217b6e105c5db97d5" //P1QJNzZhqGoxNL2igkdthNBQLNWdNGTWzQU
 	pubKey1B, _ = hex.DecodeString("02f9286c44fe7ebff9788425d5025ad764cdf5aec3daef862d143c5f09134d75b0")
