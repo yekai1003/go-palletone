@@ -317,8 +317,8 @@ func WalletCreateTransaction(c *ptnjson.CreateRawTransactionCmd) (string, error)
 		if ok == false {
 		       continue
 		}
-		for inputindex, txin := range payload.Inputs {
-            hashforsign, err := tokenengine.CalcSignatureHash(mtx, tokenengine.SigHashAll, msgindex,inputindex, nil)
+		for inputindex, _:= range payload.Inputs {
+            hashforsign, err := tokenengine.CalcSignatureHash(mtxtmp, tokenengine.SigHashAll, msgindex,inputindex, nil)
 			if err != nil {
 				return "", err
 			}
