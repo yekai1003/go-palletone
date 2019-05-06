@@ -316,6 +316,7 @@ func WalletCreateTransaction(c *ptnjson.CreateRawTransactionCmd) (string, error)
 		if err != nil {
 			return "", err
 		}
+		mtx.TxMessages[int(input.MessageIndex)].Payload.(*modules.PaymentPayload).Inputs[int(input.OutIndex)].SignatureScript = hashforsign
 		sh := common.BytesToHash(hashforsign)
 		inputjson[index].HashForSign = sh.String()
 	}
