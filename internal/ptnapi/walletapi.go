@@ -310,16 +310,23 @@ func WalletCreateTransaction(c *ptnjson.CreateRawTransactionCmd) (string, error)
 	}
 	mtx.TxMessages = append(mtx.TxMessages, modules.NewMessage(modules.APP_PAYMENT, pload))
 	//mtx.TxHash = mtx.Hash()
-	// sign mtx
-	for index, input := range inputjson {
-		hashforsign, err := tokenengine.CalcSignatureHash(mtx, tokenengine.SigHashAll, int(input.MessageIndex), int(input.OutIndex), nil)
-		if err != nil {
-			return "", err
+	//sign mtx
+	mtxtmp := mtx
+	for msgindex, msg := range mtxtmp.TxMessages {
+		payload, ok := msg.Payload.(*modules.PaymentPayload)
+		if ok == false {
+		       continue
 		}
-		mtx.TxMessages[int(input.MessageIndex)].Payload.(*modules.PaymentPayload).Inputs[int(input.OutIndex)].SignatureScript = hashforsign
-		sh := common.BytesToHash(hashforsign)
-		inputjson[index].HashForSign = sh.String()
-	}
+		for inputindex, txin := range payload.Inputs {
+            hashforsign, err := tokenengine.CalcSignatureHash(mtx, tokenengine.SigHashAll, msgindex,inputindex, nil)
+			if err != nil {
+				return "", err
+			}
+			payloadtmp := mtx.TxMessages[msgindex].Payload.(*modules.PaymentPayload)
+            payloadtmp.Inputs[inputindex].SignatureScript = hashforsign
+		}
+    }
+
 	bytetxjson, err := json.Marshal(mtx)
 	if err != nil {
 		return "", err
