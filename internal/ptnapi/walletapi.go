@@ -319,11 +319,11 @@ func WalletCreateTransaction(c *ptnjson.CreateRawTransactionCmd) (string, error)
 		sh := common.BytesToHash(hashforsign)
 		inputjson[index].HashForSign = sh.String()
 	}
-	//bytetxjson, err := json.Marshal(mtx)
-	//if err != nil {
-	//	return "", err
-	//}
-	mtxbt, err := rlp.EncodeToBytes(mtx)
+	bytetxjson, err := json.Marshal(mtx)
+	if err != nil {
+		return "", err
+	}
+	mtxbt, err := rlp.EncodeToBytes(bytetxjson)
 	if err != nil {
 		return "", err
 	}
