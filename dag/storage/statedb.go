@@ -144,7 +144,7 @@ func (statedb *StateDb) LookupMediator() map[common.Address]*core.Mediator {
 //xiaozhi
 func (statedb *StateDb) GetApprovedMediatorList() ([]*modules.MediatorRegisterInfo, error) {
 	depositeContractAddress := syscontract.DepositContractAddress
-	val, _, err := statedb.GetContractState(depositeContractAddress.Bytes(), "MediatorList")
+	val, _, err := statedb.GetContractState(depositeContractAddress.Bytes(), modules.MediatorList)
 	if err != nil {
 		return nil, fmt.Errorf("mediator candidate list is nil.")
 	}
@@ -171,7 +171,7 @@ func (statedb *StateDb) IsApprovedMediator(address common.Address) bool {
 
 func (statedb *StateDb) GetJuryCandidateList() ([]common.Address, error) {
 	depositeContractAddress := syscontract.DepositContractAddress
-	val, _, err := statedb.GetContractState(depositeContractAddress.Bytes(), "JuryList")
+	val, _, err := statedb.GetContractState(depositeContractAddress.Bytes(), modules.JuryList)
 	if err != nil {
 		return nil, fmt.Errorf("jury candidate list is nil.")
 	}
@@ -220,7 +220,7 @@ func (statedb *StateDb) UpdateSysParams(version *modules.StateVersion) error {
 			}
 		}
 		//将基金会当前单独修改的制为nil
-		err = statedb.SaveSysConfig("sysParam", nil, version)
+		err = statedb.SaveSysConfig(modules.SysParam, nil, version)
 		if err != nil {
 			return err
 		}
@@ -228,13 +228,13 @@ func (statedb *StateDb) UpdateSysParams(version *modules.StateVersion) error {
 	if info == nil {
 		return nil
 	}
-	foundAddr, _, err := statedb.GetSysConfig("FoundationAddress")
-	if err != nil {
-		return err
-	}
-	if info.CreateAddr != string(foundAddr) {
-		return fmt.Errorf("only foundation can call this function")
-	}
+	//foundAddr, _, err := statedb.GetSysConfig(modules.FoundationAddress)
+	//if err != nil {
+	//	return err
+	//}
+	//if info.CreateAddr != string(foundAddr) {
+	//	return fmt.Errorf("only foundation can call this function")
+	//}
 	if !info.IsVoteEnd {
 		return nil
 	}
@@ -251,7 +251,7 @@ func (statedb *StateDb) UpdateSysParams(version *modules.StateVersion) error {
 		}
 	}
 	//将基金会当前投票修改的制为nil
-	err = statedb.SaveSysConfig("sysParams", nil, version)
+	err = statedb.SaveSysConfig(modules.SysParams, nil, version)
 	if err != nil {
 		return err
 	}
@@ -259,7 +259,7 @@ func (statedb *StateDb) UpdateSysParams(version *modules.StateVersion) error {
 }
 
 func (statedb *StateDb) GetSysParamWithoutVote() ([]*modules.FoundModify, error) {
-	val, _, err := statedb.GetSysConfig("sysParam")
+	val, _, err := statedb.GetSysConfig(modules.SysParam)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func (statedb *StateDb) GetSysParamWithoutVote() ([]*modules.FoundModify, error)
 }
 
 func (statedb *StateDb) GetSysParamsWithVotes() (*modules.SysTokenIDInfo, error) {
-	val, _, err := statedb.GetSysConfig("sysParams")
+	val, _, err := statedb.GetSysConfig(modules.SysParams)
 	if err != nil {
 		return nil, err
 	}

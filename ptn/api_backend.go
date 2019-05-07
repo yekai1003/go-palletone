@@ -168,9 +168,13 @@ func (b *PtnApiBackend) GetTxByTxid_back(txid string) (*ptnjson.GetTxIdResult, e
 	return txOutReply, nil
 }
 
-//func (b *PtnApiBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
-//	return b.ptn.txPool.State().GetNonce(addr), nil
-//}
+func (b *PtnApiBackend) GetAllSysConfig() ([]*ptnjson.ConfigJson, error) {
+	configs, err := b.Dag().GetAllConfig()
+	if err != nil {
+		return nil, err
+	}
+	return ptnjson.ConvertAllSysConfigToJson(configs), nil
+}
 
 func (b *PtnApiBackend) Stats() (int, int, int) {
 	return b.ptn.txPool.Stats()
@@ -178,6 +182,9 @@ func (b *PtnApiBackend) Stats() (int, int, int) {
 
 func (b *PtnApiBackend) TxPoolContent() (map[common.Hash]*modules.Transaction, map[common.Hash]*modules.Transaction) {
 	return b.ptn.TxPool().Content()
+}
+func (b *PtnApiBackend) Queued() ([]*modules.TxPoolTransaction, error) {
+	return b.ptn.TxPool().Queued()
 }
 
 func (b *PtnApiBackend) SubscribeTxPreEvent(ch chan<- modules.TxPreEvent) event.Subscription {
@@ -547,7 +554,7 @@ func (b *PtnApiBackend) ContractStop(deployId []byte, txid string, deleteImage b
 	return err
 }
 
-func (b *PtnApiBackend) ContractStartChaincodeContainer(deployId []byte, txid string) ( []byte, error) {
+func (b *PtnApiBackend) ContractStartChaincodeContainer(deployId []byte, txid string) ([]byte, error) {
 	log.Debugf("======>ContractStartChaincodeContainer:deployId[%s]txid[%s]", hex.EncodeToString(deployId), txid)
 	return b.ptn.contract.StartChaincodeContainer("palletone", deployId, txid)
 }
@@ -686,6 +693,6 @@ func (s *PtnApiBackend) ProofTransactionByRlptx(rlptx [][]byte) (string, error) 
 	return "", nil
 }
 
-func (b *PtnApiBackend) ValidationPath(tx string) ([]byte, error) {
-	return nil, nil
+func (b *PtnApiBackend) SyncUTXOByAddr(addr string) string {
+	return "Error"
 }

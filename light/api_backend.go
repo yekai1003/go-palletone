@@ -95,6 +95,9 @@ func (b *LesApiBackend) GetBlock(ctx context.Context, blockHash common.Hash) (*m
 func (b *LesApiBackend) GetTd(blockHash common.Hash) *big.Int {
 	return nil
 }
+func (b *LesApiBackend) GetAllSysConfig() ([]*ptnjson.ConfigJson, error) {
+	return nil, nil
+}
 
 //func (b *LesApiBackend) GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header, vmCfg vm.Config) (*vm.EVM, func() error, error) {
 //	state.SetBalance(msg.From(), math.MaxBig256)
@@ -130,6 +133,9 @@ func (b *LesApiBackend) Stats() (pending int, queued int, reserve int) {
 func (b *LesApiBackend) TxPoolContent() (map[common.Hash]*modules.Transaction, map[common.Hash]*modules.Transaction) {
 	return nil, nil
 	//return b.ptn.txPool.Content()
+}
+func (b *LesApiBackend) Queued() ([]*modules.TxPoolTransaction, error) {
+	return nil, nil
 }
 
 func (b *LesApiBackend) SubscribeTxPreEvent(ch chan<- modules.TxPreEvent) event.Subscription {
@@ -325,7 +331,21 @@ func (b *LesApiBackend) GetAddrByOutPoint(outPoint *modules.OutPoint) (common.Ad
 	return common.Address{}, nil
 }
 func (b *LesApiBackend) GetAddrUtxos(addr string) ([]*ptnjson.UtxoJson, error) {
-	return nil, nil
+	address, err := common.StringToAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	utxos, err:= b.ptn.dag.GetAddrUtxos(address)
+	if err!=nil{
+		return nil,err
+	}
+	result := []*ptnjson.UtxoJson{}
+	for o, u := range utxos {
+		ujson := ptnjson.ConvertUtxo2Json(&o, u)
+		result = append(result, ujson)
+	}
+	return result, nil
 }
 func (b *LesApiBackend) GetAddrRawUtxos(addr string) (map[modules.OutPoint]*modules.Utxo, error) {
 	return nil, nil
@@ -431,6 +451,6 @@ func (b *LesApiBackend) ProofTransactionByRlptx(rlptx [][]byte) (string, error) 
 	return b.ptn.ProtocolManager().ReqProofByRlptx(rlptx), nil
 }
 
-func (b *LesApiBackend) ValidationPath(tx string) ([]byte, error) {
-	return nil, nil
+func (b *LesApiBackend) SyncUTXOByAddr(addr string) string {
+	return b.ptn.ProtocolManager().SyncUTXOByAddr(addr)
 }

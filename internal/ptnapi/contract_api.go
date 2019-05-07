@@ -28,6 +28,7 @@ import (
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/hexutil"
 	"github.com/palletone/go-palletone/common/log"
+	"github.com/palletone/go-palletone/contracts/syscontract"
 	"github.com/palletone/go-palletone/core/accounts"
 	"math"
 	"math/big"
@@ -132,7 +133,7 @@ func (s *PublicContractAPI) Ccstop(ctx context.Context, deployId string, txid st
 	return err
 }
 
-func (s *PublicContractAPI) Ccinstalltx(ctx context.Context, from, to, daoAmount, daoFee, tplName, path, version string) (*ContractInstallRsp, error) {
+func (s *PublicContractAPI) Ccinstalltx(ctx context.Context, from, to, daoAmount, daoFee, tplName, path, version string, addr []string) (*ContractInstallRsp, error) {
 	fromAddr, _ := common.StringToAddress(from)
 	toAddr, _ := common.StringToAddress(to)
 	amount, _ := strconv.ParseUint(daoAmount, 10, 64)
@@ -150,18 +151,18 @@ func (s *PublicContractAPI) Ccinstalltx(ctx context.Context, from, to, daoAmount
 
 	/*
 		"P1QFTh1Xq2JpfTbu9bfaMfWh2sR1nHrMV8z", "P1NHVBFRkooh8HD9SvtvU3bpbeVmuGKPPuF",
-			"P1PpgjUC7Nkxgi5KdKCGx2tMu6F5wfPGrVX", "P1MBXJypFCsQpafDGi9ivEooR8QiYmxq4qw"
+		"P1PpgjUC7Nkxgi5KdKCGx2tMu6F5wfPGrVX", "P1MBXJypFCsQpafDGi9ivEooR8QiYmxq4qw"
 	*/
-	//ads := []string{"P1QFTh1Xq2JpfTbu9bfaMfWh2sR1nHrMV8z", "P1NHVBFRkooh8HD9SvtvU3bpbeVmuGKPPuF",
+	//addr := []string{"P1QFTh1Xq2JpfTbu9bfaMfWh2sR1nHrMV8z", "P1NHVBFRkooh8HD9SvtvU3bpbeVmuGKPPuF",
 	//	"P1PpgjUC7Nkxgi5KdKCGx2tMu6F5wfPGrVX", "P1MBXJypFCsQpafDGi9ivEooR8QiYmxq4qw"}
-	var ads []string
+	//var addr []string
 
 	addrs := make([]common.Address, 0)
-	for _, s := range ads {
+	for _, s := range addr {
 		a, _ := common.StringToAddress(s)
 		addrs = append(addrs, a)
 	}
-	log.Debug("-----Ccinstalltx:", "addrHash", addrs)
+	log.Debug("-----Ccinstalltx:", "addrHash", addrs, "len", len(addrs))
 
 	reqId, tplId, err := s.b.ContractInstallReqTx(fromAddr, toAddr, amount, fee, tplName, path, version, addrs)
 	sReqId := hex.EncodeToString(reqId[:])
@@ -206,12 +207,12 @@ func (s *PublicContractAPI) Ccdeploytx(ctx context.Context, from, to, daoAmount,
 
 func (s *PublicContractAPI) DepositContractInvoke(ctx context.Context, from, to, daoAmount, daoFee string, param []string) (string, error) {
 	log.Info("---enter DepositContractInvoke---")
-	rsp, err := s.Ccinvoketx(ctx, from, to, daoAmount, daoFee, "PCGTta3M4t3yXu8uRgkKvaWd2d8DR32W9vM", param, "")
+	rsp, err := s.Ccinvoketx(ctx, from, to, daoAmount, daoFee, syscontract.DepositContractAddress.String(), param, "")
 	return rsp.ReqId, err
 }
 func (s *PublicContractAPI) DepositContractQuery(ctx context.Context, param []string) (string, error) {
 	log.Info("---enter DepositContractQuery---")
-	return s.Ccquery(ctx, "PCGTta3M4t3yXu8uRgkKvaWd2d8DR32W9vM", param)
+	return s.Ccquery(ctx, syscontract.DepositContractAddress.String(), param)
 }
 
 func (s *PublicContractAPI) Ccinvoketx(ctx context.Context, from, to, daoAmount, daoFee, deployId string, param []string, certID string) (*ContractDeployRsp, error) {

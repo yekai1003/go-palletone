@@ -182,9 +182,19 @@ func (s *PublicTxPoolAPI) Status() map[string]hexutil.Uint {
 		"orphans": hexutil.Uint(orphans),
 	}
 }
-func (s *PublicTxPoolAPI) Pending() map[common.Hash]*modules.Transaction {
-	pending, _ := s.b.TxPoolContent()
-	return pending
+func (s *PublicTxPoolAPI) Queue() map[common.Hash]*modules.Transaction {
+	_, queue := s.b.TxPoolContent()
+	return queue
+}
+
+func (s *PublicTxPoolAPI) Pending() ([]*ptnjson.TxPoolPendingJson, error) {
+	queue, err := s.b.Queued()
+	pending := make([]*ptnjson.TxPoolPendingJson, 0)
+	for _, tx := range queue {
+		item := ptnjson.ConvertTxPoolTx2PendingJson(tx)
+		pending = append(pending, item)
+	}
+	return pending, err
 }
 
 /*
@@ -290,6 +300,11 @@ func (s *PublicBlockChainAPI) GetTokenTxHistory(ctx context.Context, assetStr st
 	}
 	result, err := s.b.GetAssetTxHistory(asset)
 
+	return result, err
+}
+func (s *PublicBlockChainAPI) ListSysConfig(ctx context.Context) ([]*ptnjson.ConfigJson, error) {
+
+	result, err := s.b.GetAllSysConfig()
 	return result, err
 }
 
@@ -633,8 +648,8 @@ func (s *PublicBlockChainAPI) ProofTransactionByRlptx(ctx context.Context, rlptx
 	return s.b.ProofTransactionByRlptx(rlptx)
 }
 
-func (s *PublicBlockChainAPI) ValidationPath(ctx context.Context, tx string) ([]byte, error) {
-	return s.b.ValidationPath(tx)
+func (s *PublicBlockChainAPI) SyncUTXOByAddr(ctx context.Context, addr string) string {
+	return s.b.SyncUTXOByAddr(addr)
 }
 
 // ExecutionResult groups all structured logs emitted by the EVM

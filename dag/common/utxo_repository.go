@@ -27,6 +27,7 @@ import (
 	award2 "github.com/palletone/go-palletone/common/award"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/common/ptndb"
+	"github.com/palletone/go-palletone/contracts/syscontract"
 	"github.com/palletone/go-palletone/dag/dagconfig"
 	"github.com/palletone/go-palletone/dag/modules"
 	"github.com/palletone/go-palletone/dag/parameter"
@@ -71,7 +72,7 @@ type IUtxoRepository interface {
 	//WalletBalance(addr common.Address, asset modules.Asset) uint64
 	ComputeAwards(txs []*modules.TxPoolTransaction, dagdb storage.IDagDb) (*modules.Addition, error)
 	ComputeTxAward(tx *modules.Transaction, dagdb storage.IDagDb) (uint64, error)
-
+	ClearUtxo() error
 	SaveUtxoView(view map[modules.OutPoint]*modules.Utxo) error
 	SaveUtxoEntity(outpoint *modules.OutPoint, utxo *modules.Utxo) error
 }
@@ -93,6 +94,9 @@ func (repository *UtxoRepository) SaveUtxoView(view map[modules.OutPoint]*module
 }
 func (repository *UtxoRepository) SaveUtxoEntity(outpoint *modules.OutPoint, utxo *modules.Utxo) error {
 	return repository.utxodb.SaveUtxoEntity(outpoint, utxo)
+}
+func (repository *UtxoRepository) ClearUtxo() error {
+	return repository.utxodb.ClearUtxo()
 }
 
 /**
@@ -590,7 +594,7 @@ func (repository *UtxoRepository) ComputeTxAward(tx *modules.Transaction, dagdb 
 			return 0, nil
 		}
 		addr, _ := tokenengine.GetAddressFromScript(utxo.PkScript)
-		if addr.String() == "PCGTta3M4t3yXu8uRgkKvaWd2d8DR32W9vM" {
+		if addr.Equal(syscontract.DepositContractAddress) {
 			awards := uint64(0)
 			//对每一笔input输入进行计算奖励
 			for _, txin := range payload.Inputs {
@@ -606,7 +610,7 @@ func (repository *UtxoRepository) ComputeTxAward(tx *modules.Transaction, dagdb 
 				//header, _ := dagdb.GetHeaderByHash(unitHash)
 				//3.通过单元获取头部信息中的时间戳
 				timestamp := int64(txlookup.Timestamp)
-				depositRate, _, err := repository.statedb.GetSysConfig("DepositRate")
+				depositRate, _, err := repository.statedb.GetSysConfig(modules.DepositRate)
 				if err != nil {
 					return 0, err
 				}

@@ -71,6 +71,7 @@ type Backend interface {
 	//GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	Stats() (int, int, int)
 	TxPoolContent() (map[common.Hash]*modules.Transaction, map[common.Hash]*modules.Transaction)
+	Queued() ([]*modules.TxPoolTransaction, error)
 	SubscribeTxPreEvent(chan<- modules.TxPreEvent) event.Subscription
 
 	//ChainConfig() *configure.ChainConfig
@@ -123,7 +124,7 @@ type Backend interface {
 
 	GetAddrTxHistory(addr string) ([]*ptnjson.TxHistoryJson, error)
 	GetAssetTxHistory(asset *modules.Asset) ([]*ptnjson.TxHistoryJson, error)
-
+	GetAllSysConfig() ([]*ptnjson.ConfigJson, error)
 	//contract control
 	ContractInstall(ccName string, ccPath string, ccVersion string) (TemplateId []byte, err error)
 	ContractDeploy(templateId []byte, txid string, args [][]byte, timeout time.Duration) (deployId []byte, err error)
@@ -159,7 +160,7 @@ type Backend interface {
 	GetProofTxInfoByHash(txhash string) ([][]byte, error)
 	ProofTransactionByHash(txhash string) (string, error)
 	ProofTransactionByRlptx(rlptx [][]byte) (string, error)
-	ValidationPath(tx string) ([]byte, error)
+	SyncUTXOByAddr(addr string) string
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {
