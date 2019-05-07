@@ -1803,7 +1803,7 @@ func opcodeSha256(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	hash := crypto.HashResult(buf)
+	hash := crypto.Keccak256Hash(buf)
 	//hash := fastsha256.Sum256(buf)
 	vm.dstack.PushByteArray(hash[:])
 	return nil
@@ -1833,7 +1833,7 @@ func opcodeHash256(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	vm.dstack.PushByteArray(crypto.Hash(buf))
+	vm.dstack.PushByteArray(crypto.Keccak256(buf))
 	//vm.dstack.PushByteArray(wire.DoubleSha256(buf))
 	return nil
 }

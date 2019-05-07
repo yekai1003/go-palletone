@@ -27,6 +27,7 @@ import (
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/math"
 	"github.com/tjfoc/gmsm/sm2"
+	"golang.org/x/crypto/sha3"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -38,19 +39,29 @@ var (
 	secp256k1_halfN = new(big.Int).Div(secp256k1_N, big.NewInt(2))
 )
 
-// Hash calculates and returns the Hash hash of the input data.
-//func Keccak256(data ...[]byte) []byte {
-//	d := sha3.New256()
-//	for _, b := range data {
-//		d.Write(b)
-//	}
-//	return d.Sum(nil)
-//}
+// Keccak256 calculates and returns the Keccak256 hash of the input data.
+func Keccak256(data ...[]byte) []byte {
+	d := sha3.New256()
+	for _, b := range data {
+		d.Write(b)
+	}
+	return d.Sum(nil)
+}
 
-// HashResult calculates and returns the Hash hash of the input data,
+// Keccak256Hash calculates and returns the Keccak256 hash of the input data,
 // converting it to an internal Hash data structure.
-//func Keccak256Hash(data ...[]byte) (h common.Hash) {
-//	d := sha3.New256()
+func Keccak256Hash(data ...[]byte) (h common.Hash) {
+	d := sha3.New256()
+	for _, b := range data {
+		d.Write(b)
+	}
+	d.Sum(h[:0])
+	return h
+}
+
+// Keccak512 calculates and returns the Keccak512 hash of the input data.
+//func Keccak512(data ...[]byte) []byte {
+//	d := sha3.NewKeccak512()
 //	for _, b := range data {
 //		d.Write(b)
 //	}
