@@ -56,6 +56,22 @@ const (
 	// 添加别的msg类型，需要添加到OP_MEDIATOR_CREATE 与 APP_UNKNOW之间
 )
 
+const (
+	FoundationAddress = "FoundationAddress"
+	MediatorList      = "MediatorList"
+	JuryList          = "JuryList"
+	DepositRate       = "DepositRate"
+)
+
+const (
+	SysParam  = "sysParam"
+	SysParams = "sysParams"
+)
+
+func (mt MessageType) IsRequest() bool {
+	return mt > 99
+}
+
 // key: message.UnitHash(message+timestamp)
 type Message struct {
 	App     MessageType `json:"app"`     // message type

@@ -189,22 +189,44 @@ func GenerateP2CHUnlockScript(signs [][]byte, redeemScript []byte) []byte {
 //validate this transaction and input index script can unlock the utxo.
 func ScriptValidate(utxoLockScript []byte, pickupJuryRedeemScript txscript.PickupJuryRedeemScript, tx *modules.Transaction, msgIdx, inputIndex int) error {
 	acc := &account{}
-	vm, err := txscript.NewEngine(utxoLockScript, pickupJuryRedeemScript, tx, msgIdx, inputIndex, txscript.StandardVerifyFlags, nil, acc)
+	txCopy := tx
+	if tx.IsContractTx() {
+		isRequestMsg := false
+		for idx, msg := range tx.TxMessages {
+			if msg.App.IsRequest() {
+				isRequestMsg = true
+			}
+			if idx == msgIdx && !isRequestMsg {
+				txCopy = tx.GetRequestTx()
+			}
+		}
+	}
+	vm, err := txscript.NewEngine(utxoLockScript, pickupJuryRedeemScript, txCopy, msgIdx, inputIndex, txscript.StandardVerifyFlags, nil, acc)
 	if err != nil {
 		log.Error("Failed to create script: ", err)
 		return err
 	}
-      return vm.Execute()
+	return vm.Execute()
 }
 func ScriptValidateSm2(utxoLockScript []byte, pickupJuryRedeemScript txscript.PickupJuryRedeemScript, tx *modules.Transaction, msgIdx, inputIndex int) error {
 	acc := &accountsm2{}
-	vm, err := txscript.NewEngine(utxoLockScript, pickupJuryRedeemScript, tx, msgIdx, inputIndex, txscript.StandardVerifyFlags, nil, acc)
-	
+	txCopy := tx
+	if tx.IsContractTx() {
+		isRequestMsg := false
+		for idx, msg := range tx.TxMessages {
+			if msg.App.IsRequest() {
+				isRequestMsg = true
+			}
+			if idx == msgIdx && !isRequestMsg {
+				txCopy = tx.GetRequestTx()
+			}
+		}
+	}
+	vm, err := txscript.NewEngine(utxoLockScript, pickupJuryRedeemScript, txCopy, msgIdx, inputIndex, txscript.StandardVerifyFlags, nil, acc)
 	if err != nil {
 		log.Error("Failed to create script: ", err)
 		return err
 	}
-
 	return vm.Execute()
 }
 
