@@ -126,7 +126,7 @@ func GetSysCCList() (ccInf []cclist.CCInfo, ccCount int, errs error) {
 }
 
 //install but not into db
-func Install(dag dag.IDag, chainID string, ccName string, ccPath string, ccVersion string) (payload *md.ContractTplPayload, err error) {
+func Install(dag dag.IDag, chainID string, ccName string, ccPath string, ccVersion string, ccDescription, ccAbi, ccLanguage string) (payload *md.ContractTplPayload, err error) {
 	log.Info("Install enter", "chainID", chainID, "name", ccName, "path", ccPath, "version", ccVersion)
 	defer log.Info("Install exit", "chainID", chainID, "name", ccName, "path", ccPath, "version", ccVersion)
 
@@ -143,9 +143,9 @@ func Install(dag dag.IDag, chainID string, ccName string, ccPath string, ccVersi
 	tpid := cp.Keccak256Hash(buffer.Bytes())
 	payloadUnit := &md.ContractTplPayload{
 		TemplateId: []byte(tpid[:]),
-		Name:       ccName,
-		Path:       ccPath,
-		Version:    ccVersion,
+		//Name:       ccName,
+		//Path:       ccPath,
+		//Version:    ccVersion,
 	}
 
 	if cfg.DebugTest {
@@ -154,7 +154,7 @@ func Install(dag dag.IDag, chainID string, ccName string, ccPath string, ccVersi
 		listAdd(tcc)
 	} else {
 		//查询一下是否已经安装过
-		if v, _, _, _, _ := dag.GetContractTpl(tpid[:]); v != nil {
+		if tpl,_:= dag.GetContractTpl(tpid[:]); tpl != nil {
 			log.Error("getContractTpl err:", "error", "the contractTlp is exist")
 			return nil, errors.New("the contractTlp is exist.")
 		}
