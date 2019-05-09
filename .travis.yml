@@ -11,22 +11,22 @@ script:
     #- $GOPATH/bin/goveralls -service=travis-ci
     - cp gptn bdd/node
     - cd bdd/node
-    - pwd
     - chmod +x gptn
     - python init.py
     - nohup ./gptn &
     - sleep 15
     - netstat -ap | grep gptn
     - cd ../dct
-    #- sudo find / -name "decimal.py"
     #- ./deposit_test.sh 4
-    - python -m robot.run ../testcase/createTrans
-    - python -m robot.run ../testcase/ccinvoke
+    - python -m robot.run -d ../logs -l creatTrans.log.html ../testcase/createTrans
+    #- python -m robot.run ../testcase/ccinvoke
     #- python -m robot.run ../DigitalIdentityCert
-
 
 after_success:
     - killall gptn
+    - curl -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/creatTrans.log.html http://ftp.mozilla.org/pub/
+
+
 after_failure:
     - killall gptn
 
@@ -62,3 +62,6 @@ notifications:
             - elva1087penny@163.com
         on_success: always # default: change
         on_failure: always
+        
+deploy:
+    skip_cleanup: true
