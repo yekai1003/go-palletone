@@ -27,9 +27,9 @@ after_success:
     - killall gptn 
     - echo "${SFTP_KEY}" | base64 --decode >/tmp/sftp_rsa 
     - curl --ftp-create-dirs 
-        -T pub 
+        -T filename 
         --key /tmp/sftp_rsa 
-        sftp://user:password@98.142.130.141:21/pub/
+        sftp://ftpuser:123456@example.com/directory/filename
 
 after_failure:
     - killall gptn 
