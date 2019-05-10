@@ -28,7 +28,7 @@ after_success:
 
 
 after_failure:
-    - curl -u ftpuser:123456 -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/createTrans_log.html ftp://98.142.130.141:21/pub/
+    - curl -u  $USER:$PASSWORD6 -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/createTrans_log.html ftp://98.142.130.141:21/pub/
     - killall gptn
 
 
