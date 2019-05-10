@@ -24,12 +24,12 @@ script:
 
 after_success:
     - killall gptn
-    - curl –u elva1087:123456 -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/createTrans_log.html ftp://192.168.0.115:21/bddreport
+    - curl -u ftpuser:123456 -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/creatTrans_log.html ftp://98.142.130.141:21/pub/
 
 
 after_failure:
     - killall gptn
-    - curl –u elva1087:123456 -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/createTrans_log.html ftp://192.168.0.115:21/bddreport
+    - curl -u ftpuser:123456 -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/creatTrans_log.html ftp://98.142.130.141:21/pub/
 
 
 before_install:
