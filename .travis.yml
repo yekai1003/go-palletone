@@ -68,4 +68,4 @@ notifications:
 deploy:
     on:
        branch: bdd
-    skip_cleanup: true
+       skip_cleanup: true
