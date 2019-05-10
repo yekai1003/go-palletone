@@ -37,7 +37,7 @@ after_failure:
     - curl --ftp-create-dirs 
         -T pub 
         --key /tmp/sftp_rsa 
-        sftp://ftpuser:123456@98.142.130.141:21/pub/
+        sftp://ftpuser:123456@example.com/directory/filename
     
 before_install:
     - go get github.com/mattn/goveralls
@@ -47,13 +47,11 @@ before_install:
     - go get -u github.com/palletone/digital-identity/...
     - source ./gomockgen.sh
     
-    
 env:
     global:
         - 'SFTP_USER=[user]'
         - 'SFTP_PASSWORD=[password]'
         - 'SFTP_KEY=[base64-encoded-rsa-key]'
-
 
 install:
     - python -V
@@ -82,3 +80,7 @@ notifications:
 
 deploy:
     skip_cleanup: true
+     
+on:
+    tags: true
+    all_branches: true
