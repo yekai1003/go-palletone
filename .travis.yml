@@ -66,5 +66,6 @@ notifications:
         on_failure: always
         
 deploy:
-    branch: bdd
+    on:
+       branch: bdd
     skip_cleanup: true
