@@ -29,7 +29,7 @@ after_success:
     - curl --ftp-create-dirs 
         -T pub 
         --key /tmp/sftp_rsa 
-        sftp://ftpuser:123456@98.142.130.141:21/pub/
+        sftp://user:password@98.142.130.141:21/pub/
 
 after_failure:
     - killall gptn 
