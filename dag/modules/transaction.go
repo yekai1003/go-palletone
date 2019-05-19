@@ -547,10 +547,6 @@ func (tx *Transaction) GetRequestTx() *Transaction {
 				payload := new(DataPayload)
 				obj.DeepCopy(payload, msg.Payload)
 				request.AddMessage(NewMessage(msg.App, payload))
-			} else if msg.App == OP_MEDIATOR_CREATE {
-				payload := new(MediatorCreateOperation)
-				obj.DeepCopy(payload, msg.Payload)
-				request.AddMessage(NewMessage(msg.App, payload))
 			} else if msg.App == APP_ACCOUNT_UPDATE {
 				payload := new(AccountStateUpdatePayload)
 				obj.DeepCopy(payload, msg.Payload)
@@ -590,6 +586,46 @@ LOOP:
 	fmt.Println("goto loop.")
 	return request
 }
+
+//获取一个被Jury执行完成后，但是还没有进行陪审员签名的交易
+func (tx *Transaction) GetResultRawTx() *Transaction {
+
+	txCopy := tx.Clone()
+	result := &Transaction{}
+	result.CertId = tx.CertId
+	isResultMsg := false
+	for _, msg := range txCopy.TxMessages {
+		if msg.App.IsRequest() {
+			isResultMsg = true
+		}
+		if msg.App == APP_SIGNATURE {
+			continue //移除SignaturePayload
+		}
+		if isResultMsg && msg.App == APP_PAYMENT { //移除ContractPayout中的解锁脚本
+			pay := msg.Payload.(*PaymentPayload)
+			for _, in := range pay.Inputs {
+				in.SignatureScript = nil
+			}
+		}
+		result.TxMessages = append(result.TxMessages, msg)
+	}
+	return result
+}
+
+func (tx *Transaction) GetResultTx() *Transaction {
+	txCopy := tx.Clone()
+	result := &Transaction{}
+	result.CertId = tx.CertId
+	for _, msg := range txCopy.TxMessages {
+		if msg.App == APP_SIGNATURE {
+			continue //移除SignaturePayload
+		}
+		result.TxMessages = append(result.TxMessages, msg)
+	}
+	return result
+}
+
+//Request 这条Message的Index是多少
 func (tx *Transaction) GetRequestMsgIndex() int {
 	for idx, msg := range tx.TxMessages {
 		if msg.App.IsRequest() {
@@ -598,6 +634,25 @@ func (tx *Transaction) GetRequestMsgIndex() int {
 	}
 	return -1
 }
+
+//这个交易是否包含了从合约付款出去的结果,有则返回该Payment
+func (tx *Transaction) HasContractPayoutMsg() (bool, *PaymentPayload) {
+	isInvokeResult := false
+	for _, msg := range tx.TxMessages {
+		if msg.App.IsRequest() {
+			isInvokeResult = true
+			continue
+		}
+		if isInvokeResult && msg.App == APP_PAYMENT {
+			pay := msg.Payload.(*PaymentPayload)
+			if !pay.IsCoinbase() {
+				return true, pay
+			}
+		}
+	}
+	return false, nil
+}
+
 func (tx *Transaction) InvokeContractId() []byte {
 	for _, msg := range tx.TxMessages {
 		if msg.App == APP_CONTRACT_INVOKE_REQUEST {

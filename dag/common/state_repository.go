@@ -41,23 +41,24 @@ type IStateRepository interface {
 	GetContractTpl(tplId []byte) (*modules.ContractTemplate, error)
 	GetContractTplCode(tplId []byte) ([]byte, error)
 	GetContractDeploy(tempId, contractId []byte, name string) (*modules.ContractDeployPayload, error)
+
 	GetAllAccountStates(address common.Address) (map[string]*modules.ContractStateValue, error)
 	GetAccountState(address common.Address, statekey string) (*modules.ContractStateValue, error)
-
 	GetAccountBalance(address common.Address) uint64
+	LookupAccount() map[common.Address]*modules.AccountInfo
+
 	RetrieveMediator(address common.Address) (*core.Mediator, error)
 	StoreMediator(med *core.Mediator) error
 	GetMediators() map[common.Address]bool
-	GetApprovedMediatorList() ([]*core.MediatorApplyInfo, error)
-	IsApprovedMediator(address common.Address) bool
+	LookupMediatorInfo() []*modules.MediatorInfo
 	IsMediator(address common.Address) bool
-	LookupAccount() map[common.Address]*modules.AccountInfo
 	RetrieveMediatorInfo(address common.Address) (*modules.MediatorInfo, error)
 	StoreMediatorInfo(add common.Address, mi *modules.MediatorInfo) error
+
 	GetMinFee() (*modules.AmountAsset, error)
 	//GetCurrentChainIndex(assetId modules.AssetId) (*modules.ChainIndex, error)
 
-	GetJuryCandidateList() ([]common.Address, error)
+	GetJuryCandidateList() (map[string]bool, error)
 	IsJury(address common.Address) bool
 	UpdateSysParams(ver *modules.StateVersion) error
 	GetPartitionChains() ([]*modules.PartitionChain, error)
@@ -104,23 +105,23 @@ func (rep *StateRepository) GetContractStatesByPrefix(id []byte, prefix string) 
 func (rep *StateRepository) GetContract(id []byte) (*modules.Contract, error) {
 	return rep.statedb.GetContract(id)
 }
-func (rep *StateRepository)GetAllContracts() ([]*modules.Contract, error){
+func (rep *StateRepository) GetAllContracts() ([]*modules.Contract, error) {
 	return rep.statedb.GetAllContracts()
 }
-func (rep *StateRepository) GetContractsByTpl(tplId []byte) ([]*modules.Contract, error){
-	cids,err:=rep.statedb.GetContractIdsByTpl(tplId)
-	if err!=nil{
-		return nil,err
+func (rep *StateRepository) GetContractsByTpl(tplId []byte) ([]*modules.Contract, error) {
+	cids, err := rep.statedb.GetContractIdsByTpl(tplId)
+	if err != nil {
+		return nil, err
 	}
-	result:=make([]*modules.Contract,0,len(cids))
-	for _,cid:=range cids{
-		contract,err:= rep.statedb.GetContract(cid)
-		if err!=nil{
-			return nil,err
+	result := make([]*modules.Contract, 0, len(cids))
+	for _, cid := range cids {
+		contract, err := rep.statedb.GetContract(cid)
+		if err != nil {
+			return nil, err
 		}
-		result=append(result,contract)
+		result = append(result, contract)
 	}
-	return result,nil
+	return result, nil
 }
 
 func (rep *StateRepository) GetContractTpl(tplId []byte) (*modules.ContractTemplate, error) {
@@ -142,13 +143,13 @@ func (rep *StateRepository) GetMediators() map[common.Address]bool {
 	return rep.statedb.GetMediators()
 }
 
-func (rep *StateRepository) GetApprovedMediatorList() ([]*core.MediatorApplyInfo, error) {
-	return rep.statedb.GetApprovedMediatorList()
-}
-
-func (rep *StateRepository) IsApprovedMediator(address common.Address) bool {
-	return rep.statedb.IsApprovedMediator(address)
-}
+//func (rep *StateRepository) GetApprovedMediatorList() ([]*core.MediatorApplyInfo, error) {
+//	return rep.statedb.GetApprovedMediatorList()
+//}
+//
+//func (rep *StateRepository) IsApprovedMediator(address common.Address) bool {
+//	return rep.statedb.IsApprovedMediator(address)
+//}
 
 func (rep *StateRepository) SaveContractState(contractId []byte, ws *modules.ContractWriteSet,
 	version *modules.StateVersion) error {
@@ -171,6 +172,10 @@ func (rep *StateRepository) RetrieveMediatorInfo(address common.Address) (*modul
 	return rep.statedb.RetrieveMediatorInfo(address)
 }
 
+func (rep *StateRepository) LookupMediatorInfo() []*modules.MediatorInfo {
+	return rep.statedb.LookupMediatorInfo()
+}
+
 func (rep *StateRepository) StoreMediatorInfo(add common.Address, mi *modules.MediatorInfo) error {
 	return rep.statedb.StoreMediatorInfo(add, mi)
 }
@@ -183,7 +188,7 @@ func (rep *StateRepository) GetMinFee() (*modules.AmountAsset, error) {
 	return rep.statedb.GetMinFee()
 }
 
-func (rep *StateRepository) GetJuryCandidateList() ([]common.Address, error) {
+func (rep *StateRepository) GetJuryCandidateList() (map[string]bool, error) {
 	return rep.statedb.GetJuryCandidateList()
 }
 

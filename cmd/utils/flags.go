@@ -1182,18 +1182,17 @@ func RegisterPtnService(stack *node.Node, cfg *ptn.Config) {
 	var err error
 	if cfg.SyncMode == downloader.LightSync {
 		err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-			return light.New(ctx, cfg)
+			return light.New(ctx, cfg, configure.LPSProtocol)
 		})
 	} else {
 		err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 			fullNode, err := ptn.New(ctx, cfg)
 			if fullNode != nil && cfg.LightServ > 0 {
-				ls, _ := light.NewLesServer(fullNode, cfg)
+				ls, _ := light.NewLesServer(fullNode, cfg, configure.LPSProtocol)
 				fullNode.AddLesServer(ls)
 
 				cs, _ := cors.NewCoresServer(fullNode, cfg)
 				fullNode.AddCorsServer(cs)
-
 			}
 			return fullNode, err
 		})
