@@ -20,6 +20,7 @@ Feature: Create Token
 Request getbalance before create token
     personalUnlockAccount    ${geneAdd}
     ${PTN1}    ${result1}    normalGetBalance    ${recieverAdd}
+    sleep    4
     [Return]    ${PTN1}    ${result1}
 
 Create token of vote contract
@@ -44,7 +45,7 @@ Calculate gain of recieverAdd
 
 Request getbalance after create token
     ${PTN2}    ${result2}    normalGetBalance    ${recieverAdd}
-    sleep    3
+    sleep    4
     [Return]    ${PTN2}    ${result2}
 
 Assert gain of reciever

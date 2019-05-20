@@ -26,6 +26,7 @@ Get genesis address
 Request getbalance before create token
     [Arguments]    ${geneAdd}
     ${PTN1}    ${result1}    normalGetBalance    ${geneAdd}
+    sleep    4
     [Return]    ${PTN1}    ${result1}
 
 Create token of vote contract
@@ -43,7 +44,7 @@ Create token of vote contract
 
 Calculate gain of recieverAdd
     [Arguments]    ${PTN1}
-    sleep    3
+    sleep    4
     ${invokeGain}    Evaluate    int(${PTNAmount})+int(${PTNPoundage})
     ${GAIN}    countRecieverPTN    ${invokeGain}
     sleep    3
@@ -52,7 +53,7 @@ Calculate gain of recieverAdd
 Request getbalance after create token
     [Arguments]    ${geneAdd}
     ${PTN2}    ${result2}    normalGetBalance    ${geneAdd}
-    sleep    3
+    sleep    5
     [Return]    ${PTN2}    ${result2}
 
 Assert gain of reciever

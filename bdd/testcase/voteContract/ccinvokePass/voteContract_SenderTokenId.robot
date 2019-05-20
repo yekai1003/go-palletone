@@ -53,7 +53,7 @@ Calculate gain of recieverAdd
 Request getbalance after create token
     [Arguments]    ${geneAdd}
     ${PTN}    ${result2}    normalGetBalance    ${geneAdd}
-    sleep    3
+    sleep    4
     [Return]    ${PTN}    ${result2}
 
 Assert gain of reciever
