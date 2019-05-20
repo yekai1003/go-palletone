@@ -30,7 +30,7 @@ script:
     - nohup ./gptn &
     - sleep 15
     - netstat -ap | grep gptn
-    - cp address/. palletone/keystore/
+    - cp address/* palletone/keystore/
     - cd ../dct
     - mkdir -p ${BDD_LOG_PATH}
     #- ./deposit_test.sh 4
