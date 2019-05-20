@@ -18,13 +18,16 @@ Feature: Create Token
 
 *** Keywords ***
 Request getbalance before create token
+    ${geneAdd}    getGeneAdd    ${host}
+    Set Suite Variable    ${geneAdd}    ${geneAdd}
     personalUnlockAccount    ${geneAdd}
+    sleep    2
     ${PTN1}    ${result1}    normalGetBalance    ${recieverAdd}
-    sleep    4
+    sleep    5
     [Return]    ${PTN1}    ${result1}
 
 Create token of vote contract
-    ${geneAdd}    getGeneAdd    ${host}
+    #${geneAdd}    getGeneAdd    ${host}
     ${ccTokenList}    Create List    ${crtTokenMethod}    ${note}    ${tokenDecimal}    ${tokenAmount}    ${voteTime}
     ...    ${commonVoteInfo}
     ${ccList}    Create List    ${geneAdd}    ${recieverAdd}    ${PTNAmount}    ${PTNPoundage}    ${voteContractId}
