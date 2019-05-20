@@ -44,20 +44,20 @@ after_script:
     # upload all log
     - curl -T ${ALL_LOG_PATH} ftp://${YANGYU}:${PASSWORD}@98.142.130.141/pub/all.log -v
     # upload deposit log
-    - curl -T ${DEPOSIT_LOG_PATH}/${LOG_NAME} ${FTP_URL}/${DEPOSIT_DIR}/${LOG_NAME}
-    - curl -T ${DEPOSIT_LOG_PATH}/${REPORT_NAME} ${FTP_URL}/${DEPOSIT_DIR}/${REPORT_NAME}
+    #- curl -T ${DEPOSIT_LOG_PATH}/${LOG_NAME} ${FTP_URL}/${DEPOSIT_DIR}/${LOG_NAME}
+    #- curl -T ${DEPOSIT_LOG_PATH}/${REPORT_NAME} ${FTP_URL}/${DEPOSIT_DIR}/${REPORT_NAME}
     # upload create transactions log and report
-    - curl -T ${BDD_LOG_PATH}/${CREATE_TRANS_DIR}/${LOG_NAME} ${FTP_URL}/${CREATE_TRANS_DIR}/${LOG_NAME} -v
-    - curl -T ${BDD_LOG_PATH}/${CREATE_TRANS_DIR}/${REPORT_NAME} ${FTP_URL}/${CREATE_TRANS_DIR}/${REPORT_NAME} -v
+    #- curl -T ${BDD_LOG_PATH}/${CREATE_TRANS_DIR}/${LOG_NAME} ${FTP_URL}/${CREATE_TRANS_DIR}/${LOG_NAME} -v
+    #- curl -T ${BDD_LOG_PATH}/${CREATE_TRANS_DIR}/${REPORT_NAME} ${FTP_URL}/${CREATE_TRANS_DIR}/${REPORT_NAME} -v
     # upload ccinvoke log and report
-    - curl -T ${BDD_LOG_PATH}/${CCINVOKE_DIR}/${LOG_NAME} ${FTP_URL}/${CCINVOKE_DIR}/${LOG_NAME} -v
-    - curl -T ${BDD_LOG_PATH}/${CCINVOKE_DIR}/${REPORT_NAME} ${FTP_URL}/${CCINVOKE_DIR}/${REPORT_NAME} -v
+    #- curl -T ${BDD_LOG_PATH}/${CCINVOKE_DIR}/${LOG_NAME} ${FTP_URL}/${CCINVOKE_DIR}/${LOG_NAME} -v
+    #- curl -T ${BDD_LOG_PATH}/${CCINVOKE_DIR}/${REPORT_NAME} ${FTP_URL}/${CCINVOKE_DIR}/${REPORT_NAME} -v
     # upload voteContract log and report
     - curl -T ${BDD_LOG_PATH}/${VOTECONTRACT_DIR}/${LOG_NAME} ${FTP_URL}/${VOTECONTRACT_DIR}/${LOG_NAME} -v
     - curl -T ${BDD_LOG_PATH}/${VOTECONTRACT_DIR}/${REPORT_NAME} ${FTP_URL}/${VOTECONTRACT_DIR}/${REPORT_NAME} -v
     # upload digital identity log and report
-    - curl -T ${BDD_LOG_PATH}/${DIGITAL_IDENTITY_DIR}/${LOG_NAME} ${FTP_URL}/${DIGITAL_IDENTITY_DIR}/${LOG_NAME} -v
-    - curl -T ${BDD_LOG_PATH}/${DIGITAL_IDENTITY_DIR}/${REPORT_NAME} ${FTP_URL}/${DIGITAL_IDENTITY_DIR}/${REPORT_NAME} -v
+    #- curl -T ${BDD_LOG_PATH}/${DIGITAL_IDENTITY_DIR}/${LOG_NAME} ${FTP_URL}/${DIGITAL_IDENTITY_DIR}/${LOG_NAME} -v
+    #- curl -T ${BDD_LOG_PATH}/${DIGITAL_IDENTITY_DIR}/${REPORT_NAME} ${FTP_URL}/${DIGITAL_IDENTITY_DIR}/${REPORT_NAME} -v
     # echo ftp address
     - echo "The path of all bdd log in vsftpd is 'ftp://98.142.130.141/pub', but you should quit VPN first"
 

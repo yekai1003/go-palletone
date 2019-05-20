@@ -1,7 +1,9 @@
 *** Settings ***
 Library           RequestsLibrary
 Library           Collections
-Library           D:/Python2.7/Lib/decimal.py
+Library            /opt/python/2.7.15/lib/python2.7/decimal.py
+#Library           D:/Python2.7/Lib/decimal.py
+
 
 *** Variables ***
 # settings
