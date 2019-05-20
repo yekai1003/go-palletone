@@ -29,5 +29,5 @@ Ccinvoke RecieverPTN
     ${PTNGAIN}    Evaluate    decimal.Decimal('${PTN1}')+decimal.Decimal('${gain1}')    decimal
     sleep    2
     ${PTN2}    ${result}    normalGetBalance    ${recieverAdd}
-    sleep    2
+    sleep    4
     Should Be Equal As Numbers    ${PTN2}    ${PTNGAIN}
