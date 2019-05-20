@@ -1,78 +1,3 @@
-<<<<<<< HEAD
-os: linux
-dist: xenial
-sudo: required
-language:
-    - go
-go:
-    - 1.10.8
-script:
-    - go build ./cmd/gptn
-    - make gptn
-    #- $GOPATH/bin/goveralls -service=travis-ci
-    - cp gptn bdd/node
-    - cd bdd/node
-    - chmod +x gptn
-    - python init.py
-    - nohup ./gptn &
-    - sleep 15
-    - netstat -ap | grep gptn
-    - cd ../dct
-    #- ./deposit_test.sh 4
-    - python -m robot.run -d ../logs -l creatTrans_log.html ../testcase/createTrans
-    - python -m robot.run ../testcase/ccinvoke
-    - python -m robot.run ../DigitalIdentityCert
-
-after_success:
-    - curl -u $USER:$PASSWORD -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/createTrans_log.html ftp://98.142.130.141:21/pub/
-    - killall gptn
-
-
-after_failure:
-    - curl -u  $USER:$PASSWORD6 -T /home/travis/gopath/src/github.com/palletone/go-palletone/bdd/logs/createTrans_log.html ftp://98.142.130.141:21/pub/
-    - killall gptn
-
-
-before_install:
-    - go get github.com/mattn/goveralls
-    - go get -u github.com/palletone/adaptor
-    - go get -u github.com/palletone/btc-adaptor
-    - go get -u github.com/palletone/eth-adaptor
-    - go get -u github.com/palletone/digital-identity/...
-    - source ./gomockgen.sh
-
-install:
-    - python -V
-    - whereis python
-    - which python
-    - sudo -H pip install --upgrade pip
-    - sudo -H pip install robotframework==2.8.5
-    - sudo -H pip install requests
-    - sudo -H pip install robotframework-requests
-    - sudo -H pip install demjson
-    - sudo -H pip install pexpect
-    - sudo -H apt-get install expect
-    #- sudo -H apt-get install jq tcl tk
-
-addons:
-    apt:
-        update: true
-
-notifications:
-    email: elva1087penny@163.com
-    email:
-        recipients:
-            - elva1087penny@163.com
-        on_success: always # default: change
-        on_failure: always
-        
-deploy:
-    skip_cleanup: true
-    
-on:
-    tags: true
-    all_branches: true
-=======
 os: linux
 dist: xenial
 sudo: required
@@ -87,6 +12,7 @@ env:
         - DEPOSIT_LOG_PATH=/home/travis/gopath/src/github.com/palletone/go-palletone/bdd/dct/log
         - CREATE_TRANS_DIR=createTrans
         - CCINVOKE_DIR=ccinvoke
+        - VOTECONTRACT_DIR=voteContract
         - DIGITAL_IDENTITY_DIR=DigitalIdentityCert
         - DEPOSIT_DIR=deposit
         - LOG_NAME=log.html
@@ -104,12 +30,14 @@ script:
     - nohup ./gptn &
     - sleep 15
     - netstat -ap | grep gptn
+    - cp address/. palletone/keystore/
     - cd ../dct
     - mkdir -p ${BDD_LOG_PATH}
-    - ./deposit_test.sh 4
+    #- ./deposit_test.sh 4
     - python -m robot.run -d ${BDD_LOG_PATH}/${CREATE_TRANS_DIR} ../testcase/createTrans
-    - python -m robot.run -d ${BDD_LOG_PATH}/${CCINVOKE_DIR} ../testcase/ccinvoke
-    - python -m robot.run -d ${BDD_LOG_PATH}/${DIGITAL_IDENTITY_DIR} ../DigitalIdentityCert
+    #- python -m robot.run -d ${BDD_LOG_PATH}/${CCINVOKE_DIR} ../testcase/ccinvoke
+    - python -m robot.run -d ${BDD_LOG_PATH}/${VOTECONTRACT_DIR} ../testcase/voteContract
+    #- python -m robot.run -d ${BDD_LOG_PATH}/${DIGITAL_IDENTITY_DIR} ../DigitalIdentityCert
 
 after_script:
     - killall gptn
@@ -124,6 +52,9 @@ after_script:
     # upload ccinvoke log and report
     - curl -T ${BDD_LOG_PATH}/${CCINVOKE_DIR}/${LOG_NAME} ${FTP_URL}/${CCINVOKE_DIR}/${LOG_NAME} -v
     - curl -T ${BDD_LOG_PATH}/${CCINVOKE_DIR}/${REPORT_NAME} ${FTP_URL}/${CCINVOKE_DIR}/${REPORT_NAME} -v
+    # upload voteContract log and report
+    - curl -T ${BDD_LOG_PATH}/${VOTECONTRACT_DIR}/${LOG_NAME} ${FTP_URL}/${VOTECONTRACT_DIR}/${LOG_NAME} -v
+    - curl -T ${BDD_LOG_PATH}/${VOTECONTRACT_DIR}/${REPORT_NAME} ${FTP_URL}/${VOTECONTRACT_DIR}/${REPORT_NAME} -v
     # upload digital identity log and report
     - curl -T ${BDD_LOG_PATH}/${DIGITAL_IDENTITY_DIR}/${LOG_NAME} ${FTP_URL}/${DIGITAL_IDENTITY_DIR}/${LOG_NAME} -v
     - curl -T ${BDD_LOG_PATH}/${DIGITAL_IDENTITY_DIR}/${REPORT_NAME} ${FTP_URL}/${DIGITAL_IDENTITY_DIR}/${REPORT_NAME} -v
@@ -167,5 +98,3 @@ notifications:
             - elva1087penny@163.com
         on_success: always # default: change
         on_failure: always
-
->>>>>>> master
