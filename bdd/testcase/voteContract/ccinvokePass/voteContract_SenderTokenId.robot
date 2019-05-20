@@ -19,14 +19,15 @@ createTokenVerifySenderPTN
 
 *** Keywords ***
 Get genesis address
-    personalUnlockAccount    ${geneAdd}
     ${geneAdd}    getGeneAdd    ${host}
+    Set Suite Variable    ${geneAdd}    ${geneAdd}
+    personalUnlockAccount    ${geneAdd}
     [Return]    ${geneAdd}
 
 Request getbalance before create token
     [Arguments]    ${geneAdd}
     ${PTN1}    ${result1}    normalGetBalance    ${geneAdd}
-    sleep    4
+    sleep    5
     [Return]    ${PTN1}    ${result1}
 
 Create token of vote contract
@@ -53,7 +54,7 @@ Calculate gain of recieverAdd
 Request getbalance after create token
     [Arguments]    ${geneAdd}
     ${PTN}    ${result2}    normalGetBalance    ${geneAdd}
-    sleep    4
+    sleep    5
     [Return]    ${PTN}    ${result2}
 
 Assert gain of reciever

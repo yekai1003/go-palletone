@@ -19,8 +19,9 @@ Feature: Vote Contract- Create token
 
 *** Keywords ***
 Get genesis address
-    personalUnlockAccount    ${geneAdd}
     ${geneAdd}    getGeneAdd    ${host}
+    Set Suite Variable    ${geneAdd}    ${geneAdd}
+    personalUnlockAccount    ${geneAdd}
     [Return]    ${geneAdd}
 
 Request getbalance before create token
