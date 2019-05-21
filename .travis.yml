@@ -17,7 +17,7 @@ env:
         - DEPOSIT_DIR=deposit
         - LOG_NAME=log.html
         - REPORT_NAME=report.html
-        - FTP_URL=ftp://${YANGYU}:${PASSWORD}@98.142.130.141/pub
+        - FTP_URL=ftp://${MIHO}:${PASSWORD}@98.142.130.141/pub
 
 script:
     - go build ./cmd/gptn
@@ -27,7 +27,6 @@ script:
     - cd bdd/node
     - chmod +x gptn
     - python init.py
-    #- cp address/* palletone/keystore/
     - nohup ./gptn &
     - sleep 15
     - netstat -ap | grep gptn
@@ -92,7 +91,7 @@ deploy:
 #        branch: bdd
 
 notifications:
-    email: elva1087penny@163.com
+
     email:
         recipients:
             - elva1087penny@163.com
