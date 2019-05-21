@@ -87,8 +87,8 @@ addons:
 
 deploy:
     skip_cleanup: true
-#    on:
-#        branch: bdd
+    on:
+        branch: all
 
 notifications:
 
