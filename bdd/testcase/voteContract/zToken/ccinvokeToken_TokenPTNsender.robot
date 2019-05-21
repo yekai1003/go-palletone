@@ -1,5 +1,6 @@
 *** Settings ***
 Suite Setup       voteTransToken
+Default Tags      normal
 Library           ../../utilFunc/createToken.py
 Resource          ../../utilKwd/utilVariables.txt
 Resource          ../../utilKwd/normalKwd.txt

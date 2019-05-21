@@ -1,4 +1,5 @@
 *** Settings ***
+Default Tags      normal
 Library           RequestsLibrary
 Library           Collections
 Library           /opt/python/2.7.15/lib/python2.7/decimal.py
@@ -24,7 +25,7 @@ ${gain}           2000
 Ccinvoke RecieverPTN
     ${PTN1}    ${result}    normalGetBalance    ${recieverAdd}
     normalCcinvokePass    ${result_code}    ${tokenId}    ${tokenDecimal}    ${tokenAmount}    ${amount}    1
-	sleep    2
+    sleep    2
     ${gain1}    countRecieverPTN    ${gain}
     ${PTNGAIN}    Evaluate    decimal.Decimal('${PTN1}')+decimal.Decimal('${gain1}')    decimal
     sleep    2
