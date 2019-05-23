@@ -1,17 +1,15 @@
 *** Settings ***
 Library           RequestsLibrary
 Library           Collections
-Library            /opt/python/2.7.15/lib/python2.7/decimal.py
-#Library           D:/Python2.7/Lib/decimal.py
-
+Library           D:/Python2.7/Lib/decimal.py
 
 *** Variables ***
 # settings
 ${host}           http://localhost:8545/
 
-
 # methods
 ${crtTokenMethod}    createToken
+${supplyTokenMethod}    supplyToken
 ${invokePsMethod}    contract_ccinvoketxPass
 ${invokeMethod}    contract_ccinvoketx
 ${queryMethod}    contract_ccquery
@@ -33,9 +31,10 @@ ${PTNAmount}     1000
 ${PTNPoundage}     1
 ${tokenDecimal}    1
 ${tokenAmount}    25000
+${supplyTokenAmount}    1500000000000
 ${note}    evidence
 ${voteId}    VOTE
-${voteTime}    2021-12-31 20:00:00
+${voteTime}    2023-12-31 20:00:00
 ${commonVoteInfo}    [{\"TopicTitle\":\"vote your love blockchain\",\"SelectOptions\":[\"ptn0\",\"btc0\",\"eth0\",\"eos0\"],\"SelectMax\":1},{\"TopicTitle\":\"vote your hate blockchain\",\"SelectOptions\":[\"ptn1\",\"btc1\",\"eth1\",\"eos1\"],\"SelectMax\":2}]
 ${destructionAdd}    P1111111111111111111114oLvT2
 ${supportInfo}    ["support", "[{\"TopicIndex\":1,\"SelectIndexs\":[1]},{\"TopicIndex\":2,\"SelectIndexs\":[1,2]}]"]

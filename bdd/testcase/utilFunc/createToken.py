@@ -217,6 +217,47 @@ class createToken(object):
                 ext.message
                 print "assert failed.\n"
 
+    def getTxByReqId(self,reqId):
+        data = {
+                "jsonrpc":"2.0",
+                "method":"dag_getTxByReqId",
+                "params":
+                    [reqId],
+                "id":1
+            }
+        data = json.dumps(data)
+        response = requests.post(url=self.domain, data=data, headers=self.headers)
+        result1 = json.loads(response.content)
+        return result1
+
+    def ccqueryVoteResult(self,result,CreateAddr,AssetID):
+        #result = "{\"IsVoteEnd\":false,\"CreateAddr\":\"P14432ABS64C2qDxJSqs4xQ9ZdXL2Zc46a7\",\"TotalSupply\":2000,\"SupportResults\":[{\"TopicIndex\":1,\"TopicTitle\":\"vote your love blockchain\",\"VoteResults\":[{\"SelectOption\":\"ptn0\",\"Num\":1},{\"SelectOption\":\"btc0\",\"Num\":0},{\"SelectOption\":\"eth0\",\"Num\":0},{\"SelectOption\":\"eos0\",\"Num\":0}]},{\"TopicIndex\":2,\"TopicTitle\":\"vote your hate blockchain\",\"VoteResults\":[{\"SelectOption\":\"ptn1\",\"Num\":2},{\"SelectOption\":\"btc1\",\"Num\":2},{\"SelectOption\":\"eth1\",\"Num\":0},{\"SelectOption\":\"eos1\",\"Num\":0}]}],\"AssetID\":\"VOTE+0GF8VT5B9G1IAT6QRRX\"}"
+        result = json.loads(result)
+        expectList = [2000,
+                      AssetID,
+                      False,
+                      [{u'VoteResults': [{u'Num': 1, u'SelectOption': u'ptn0'}, {u'Num': 0, u'SelectOption': u'btc0'}, {u'Num': 0, u'SelectOption': u'eth0'}, {u'Num': 0, u'SelectOption': u'eos0'}], u'TopicIndex': 1, u'TopicTitle': u'vote your love blockchain'}, {u'VoteResults': [{u'Num': 2, u'SelectOption': u'ptn1'}, {u'Num': 2, u'SelectOption': u'btc1'}, {u'Num': 0, u'SelectOption': u'eth1'}, {u'Num': 0, u'SelectOption': u'eos1'}], u'TopicIndex': 2, u'TopicTitle': u'vote your hate blockchain'}],
+                      CreateAddr
+                      ]
+        keyList = []
+        valueList = []
+        print "There is key,value of dictionary:"
+        for key in result:
+            #print key,result[key]
+            keyList.append(key)
+            valueList.append(result[key])
+        print valueList
+        for n in range(len(expectList)):
+            self.assertDict(result,keyList,expectList,n)
+        return result
+
+    def assertDict(self,result,keyList,expectList,n):
+        keyword = keyList[n]
+        try:
+            assert result[keyword] == expectList[n]
+        except AssertionError:
+            print keyword+" wrong: Actual is "+str(result[keyword])+".Expect is "+str(expectList[n])
+
     def voteExist(self,voteId,dict):
         data = json.dumps(dict)
         if voteId in data:
@@ -230,4 +271,4 @@ if __name__ == '__main__':
     pass
     #voteId = "VOTE+0G7N1MFOXE1DYRHFXUP"
     #dict = {"id":1,"jsonrpc":"2.0","result":{"PTN":"0.00003","VOTE+0G7N1MFOXE1DYRHFXUP":"1000"}}
-    #result = createToken().voteExist(voteId,dict)
+    #createToken().ccqueryVoteResult('P14432ABS64C2qDxJSqs4xQ9ZdXL2Zc46a7','VOTE+0GF8VT5B9G1IAT6QRRX')

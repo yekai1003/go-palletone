@@ -23,9 +23,8 @@ normalSendTrans
 
 normalCcinvokePass
     [Arguments]    ${result_code}    ${tokenId}    ${tokenDecimal}    ${tokenAmount}    ${amount}    ${poundage}
-    ${ret}    Given I_set_CcinvokePass_params_to_Normal    ${tokenId}    ${tokenDecimal}    ${tokenAmount}    ${amount}    ${poundage}
-    ${resp}    When I_post_a_CcinvokePass_request    ${ret}
-    ${resultCrt}    Then I_get_a_CcinvokePass_result    ${resp}    ${result_code}
+    ${resultCrt}    Given I_set_CcinvokePass_params_to_Normal    ${result_code}    ${tokenId}    ${tokenDecimal}    ${tokenAmount}    ${amount}
+    ...    ${poundage}
     [Return]    ${resultCrt}
 
 normalTransferToken
