@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/palletone/go-palletone/common"
+	"github.com/palletone/go-palletone/common/crypto"
 	"github.com/palletone/go-palletone/common/log"
 	"github.com/palletone/go-palletone/contracts/shim"
 	pb "github.com/palletone/go-palletone/core/vmContractPub/protos/peer"
@@ -556,7 +557,7 @@ func converAmount(a int64) float64 {
 }
 func genRawTx(btcAmout, btcFee int64, btcAddr string, unspends []Unspend, stub shim.ChaincodeStubInterface) (string, error) {
 	//
-	rawTxGen := BTCTransaction_rawTransactionGen{Method: "RawTransactionGe"}
+	rawTxGen := BTCTransaction_rawTransactionGen{Method: "RawTransactionGen"}
 	totalAmount := int64(0)
 	for i := range unspends {
 		rawTxGen.Inputs = append(rawTxGen.Inputs, Input{Txid: unspends[i].Txid, Vout: uint32(unspends[i].Vout)})
@@ -665,8 +666,8 @@ func mergeTx(rawTx string, inputRedeemIndex []int, redeemHex []string, juryMsg [
 	num := 1
 	for i := 0; i < num; i++ {
 		mergeTx.MergeTransactionHexs = []string{}
-		mergeTx.MergeTransactionHexs = append(mergeTx.MergeTransactionHexs, string(answers[array[i][0]]))
-		mergeTx.MergeTransactionHexs = append(mergeTx.MergeTransactionHexs, string(answers[array[i][1]]))
+		mergeTx.MergeTransactionHexs = append(mergeTx.MergeTransactionHexs, string(answers[array[i][0]-1]))
+		mergeTx.MergeTransactionHexs = append(mergeTx.MergeTransactionHexs, string(answers[array[i][1]-1]))
 		//
 		reqBytes, err := json.Marshal(mergeTx)
 		if err != nil {
@@ -763,7 +764,7 @@ func consult(stub shim.ChaincodeStubInterface, content []byte, myAnswer []byte) 
 		return nil, errors.New("SendJury rawTx failed")
 	}
 	log.Debugf("sendResult: %s", common.Bytes2Hex(sendResult))
-	recvResult, err := stub.RecvJury(2, []byte("getPubkey"), 2)
+	recvResult, err := stub.RecvJury(2, content, 2)
 	if err != nil {
 		log.Debugf("RecvJury rawTx err: %s", err.Error())
 		return nil, errors.New("RecvJury rawTx failed")
@@ -799,13 +800,21 @@ func _withdrawBTC(args []string, stub shim.ChaincodeStubInterface) pb.Response {
 		jsonResp := "{\"Error\":\"GetInvokeTokens failed\"}"
 		return shim.Success([]byte(jsonResp))
 	}
+
 	btcTokenAmount := uint64(0)
+	log.Debugf("contractAddr %s", contractAddr)
 	for i := 0; i < len(invokeTokens); i++ {
+		log.Debugf("invokeTokens[i].Address %s", invokeTokens[i].Address)
 		if invokeTokens[i].Address == contractAddr {
 			if invokeTokens[i].Asset.AssetId == btcTokenAsset.AssetId {
 				btcTokenAmount += invokeTokens[i].Amount
 			}
 		}
+	}
+	if btcTokenAmount == 0 {
+		log.Debugf("You need send contractAddr btcToken")
+		jsonResp := "{\"Error\":\"You need send contractAddr btcToken\"}"
+		return shim.Success([]byte(jsonResp))
 	}
 
 	// 取未花费
@@ -816,6 +825,10 @@ func _withdrawBTC(args []string, stub shim.ChaincodeStubInterface) pb.Response {
 	}
 	// 产生交易
 	rawTx, err := genRawTx(int64(btcTokenAmount), btcFee, btcAddr, selUnspnds, stub)
+	if err != nil {
+		return shim.Success([]byte("genRawTx failed: " + err.Error()))
+	}
+	log.Debugf("rawTx:%s", rawTx)
 
 	//
 	inputRedeemIndex := []int{}
@@ -838,9 +851,17 @@ func _withdrawBTC(args []string, stub shim.ChaincodeStubInterface) pb.Response {
 	}
 	// 签名交易
 	rawTxSign, err := signTx(rawTx, inputRedeemIndex, redeemHex, stub)
+	if err != nil {
+		return shim.Success([]byte("signTx failed: " + err.Error()))
+	}
+	log.Debugf("rawTxSign:%s", rawTxSign)
+
+	tempHash := crypto.Keccak256([]byte(rawTx))
+	tempHashHex := fmt.Sprintf("%x", tempHash)
+	log.Debugf("tempHashHex:%s", tempHashHex)
 
 	//协商交易
-	recvResult, err := consult(stub, []byte(rawTx), []byte(rawTxSign))
+	recvResult, err := consult(stub, []byte(tempHashHex), []byte(rawTxSign))
 	var juryMsg []JuryMsgAddr
 	err = json.Unmarshal(recvResult, &juryMsg)
 	if err != nil {
@@ -858,13 +879,21 @@ func _withdrawBTC(args []string, stub shim.ChaincodeStubInterface) pb.Response {
 	}
 	txHash := ""
 	if strings.Compare(minSig, rawTxSign) == 0 { //自己是执行jury
+		ts := time.Now()
 		// 合并交易
 		tx, err := mergeTx(rawTx, inputRedeemIndex, redeemHex, juryMsg, stub)
+		te := time.Now()
+		t := te.Sub(ts)
+		log.Debugf("mergeTx : %f", t.Seconds())
 		if err != nil {
+			log.Debugf("mergeTx failed:  %s", err.Error())
 			return shim.Success([]byte("mergeTx failed: " + err.Error()))
 		}
 		// 发送交易
 		txHash, err = sendTx(tx, stub)
+		te = time.Now()
+		t = te.Sub(ts)
+		log.Debugf("mergeTx + sendTx : %f", t.Seconds())
 		if err != nil {
 			return shim.Success([]byte("sendTx failed: " + err.Error()))
 		}

@@ -41,7 +41,7 @@ const (
 	maxUncleDist  = 14                     /*7*/ // Maximum allowed backward distance from the chain head
 	maxQueueDist  = 32                     // Maximum allowed distance from the chain head to queue
 	hashLimit     = 256                    // Maximum number of unique blocks a peer may have announced
-	blockLimit    = 64                     // Maximum number of unique blocks a peer may have delivered
+	blockLimit    = 65536                  //headersiz:1024 bytes   fetchersize:1024*1024*64bytes    blockLimit:1024*64        //64                     // Maximum number of unique blocks a peer may have delivered
 )
 
 var (
@@ -260,12 +260,13 @@ func (f *LightFetcher) enqueue(p *peer, header *modules.Header) {
 		log.Debug("Discarded propagated block, exceeded allowance", "peer", p.id, "number", header.Index(), "hash", hash, "limit", blockLimit)
 		return
 	}
+	log.Debug("Cors Fetcher propagated block, current allowance", "count", count, "limit", blockLimit)
 	// Discard any past or too distant blocks
-	heightChain := int64(f.lightChainHeight(header.Number.AssetID))
-	if dist := int64(header.Number.Index) - heightChain; dist < -maxUncleDist || dist > maxQueueDist {
-		log.Debug("Discarded propagated block, too far away", "peer", p.id, "number", header.Index(), "heightChain", heightChain, "distance", dist)
-		return
-	}
+	//heightChain := int64(f.lightChainHeight(header.Number.AssetID))
+	//if dist := int64(header.Number.Index) - heightChain; dist < -maxUncleDist || dist > maxQueueDist {
+	//	log.Debug("Discarded propagated block, too far away", "peer", p.id, "number", header.Index(), "heightChain", heightChain, "distance", dist)
+	//	return
+	//}
 	// Schedule the block for future importing
 	if _, ok := f.queued[hash]; !ok {
 		op := &inject{
