@@ -2,8 +2,8 @@ package modules
 
 import (
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/palletone/go-palletone/common"
+	"github.com/palletone/go-palletone/common/rlp"
 	"github.com/palletone/go-palletone/common/util"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -12,25 +12,39 @@ import (
 var hash = common.HexToHash("0x76a914bd05274d98bb768c0e87a55d9a6024f76beb462a88ac")
 
 type TestA struct {
-	A        uint64
-	B        string
-	Parent   *TestA
-	Children []*TestA
+	B string
+	A uint64
+}
+type TestB struct {
+	A uint64
+	B string
+}
+type TestC struct {
+	B string
+	A byte
 }
 
 func TestRlpA(t *testing.T) {
-	a := &TestA{A: 123, B: "abc"}
-	b1, _ := rlp.EncodeToBytes(a)
-	a1 := &TestA{}
+	a1 := &TestA{A: 255, B: "abc"}
+	b1, _ := rlp.EncodeToBytes(a1)
 	t.Logf("Rlp:%x", b1)
-	b := &TestA{}
-	a1.Parent = b
-	b2, _ := rlp.EncodeToBytes(a1)
+
+	a2 := &TestB{A: 255, B: "abc"}
+	b2, _ := rlp.EncodeToBytes(a2)
 	t.Logf("Rlp:%x", b2)
-	err := rlp.DecodeBytes(b2, a1)
-	if err != nil {
-		t.Log(err.Error())
-	}
+
+	a3 := &TestC{A: 255, B: "abc"}
+	b3, _ := rlp.EncodeToBytes(a3)
+	t.Logf("Rlp:%x", b3)
+
+	//b := &TestA{}
+	//a1.Parent = b
+	//b2, _ := rlp.EncodeToBytes(a1)
+	//t.Logf("Rlp:%x", b2)
+	//err := rlp.DecodeBytes(b2, a1)
+	//if err != nil {
+	//	t.Log(err.Error())
+	//}
 }
 
 type TestInput struct {
